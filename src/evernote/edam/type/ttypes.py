@@ -323,13 +323,13 @@ class UserAttributes(object):
      <dd>A code indicating where the user was sent from. AKA
       promotion code
      </dd>
-      
+  
    <dt>sentEmailDate</dt>
      <dd>The most recent date when the user sent outbound
       emails from the service.  Used with sentEmailCount to limit the number
       of emails that can be sent per day.
      </dd>
-      
+  
    <dt>sentEmailCount</dt>
      <dd>The number of emails that were sent from the user
       via the service on sentEmailDate.  Used to enforce a limit on the number
@@ -382,7 +382,7 @@ class UserAttributes(object):
    <dt>groupName</dt>
      <dd>A name identifier used to identify a particular set of branding and
       light customization.</dd>
-      
+  
    <dt>recognitionLanguage</dt>
      <dd>a 2 character language codes based on:
          http://ftp.ics.uci.edu/pub/ietf/http/related/iso639.txt
@@ -390,20 +390,27 @@ class UserAttributes(object):
          when processing images and PDF files to find text.
          If not set, then the 'preferredLanguage' will be used.
      </dd>
-   </dl>
   
    <dt>customerProfileId</dt>
      <dd>a numeric identified which provides a linkage between the user record
          and the direct credit card payment creditcard profile.
      </dd>
-   </dl>
   
    <dt>educationalInstitution</dt>
      <dd>a flag indicating that the user is part of an educational institution which
      makes them eligible for discounts on bulk purchases
      </dd>
+  
+   <dt>businessAddress</dt>
+     <dd>A string recording the business address of a Sponsored Account user who has requested invoicing.
+     </dd>
    </dl>
   
+   <dt>hideSponsorBilling</dt>
+     <dd>A flag indicating whether to hide the billing information on a sponsored
+         account owner's settings page
+     </dd>
+   </dl>
   
   Attributes:
    - defaultLocationName
@@ -433,6 +440,8 @@ class UserAttributes(object):
    - customerProfileId
    - referralProof
    - educationalDiscount
+   - businessAddress
+   - hideSponsorBilling
   """
 
   thrift_spec = (
@@ -466,9 +475,11 @@ class UserAttributes(object):
     (27, TType.I64, 'customerProfileId', None, None, ), # 27
     (28, TType.STRING, 'referralProof', None, None, ), # 28
     (29, TType.BOOL, 'educationalDiscount', None, None, ), # 29
+    (30, TType.STRING, 'businessAddress', None, None, ), # 30
+    (31, TType.BOOL, 'hideSponsorBilling', None, None, ), # 31
   )
 
-  def __init__(self, defaultLocationName=None, defaultLatitude=None, defaultLongitude=None, preactivation=None, viewedPromotions=None, incomingEmailAddress=None, recentMailedAddresses=None, comments=None, dateAgreedToTermsOfService=None, maxReferrals=None, referralCount=None, refererCode=None, sentEmailDate=None, sentEmailCount=None, dailyEmailLimit=None, emailOptOutDate=None, partnerEmailOptInDate=None, preferredLanguage=None, preferredCountry=None, clipFullPage=None, twitterUserName=None, twitterId=None, groupName=None, recognitionLanguage=None, customerProfileId=None, referralProof=None, educationalDiscount=None,):
+  def __init__(self, defaultLocationName=None, defaultLatitude=None, defaultLongitude=None, preactivation=None, viewedPromotions=None, incomingEmailAddress=None, recentMailedAddresses=None, comments=None, dateAgreedToTermsOfService=None, maxReferrals=None, referralCount=None, refererCode=None, sentEmailDate=None, sentEmailCount=None, dailyEmailLimit=None, emailOptOutDate=None, partnerEmailOptInDate=None, preferredLanguage=None, preferredCountry=None, clipFullPage=None, twitterUserName=None, twitterId=None, groupName=None, recognitionLanguage=None, customerProfileId=None, referralProof=None, educationalDiscount=None, businessAddress=None, hideSponsorBilling=None,):
     self.defaultLocationName = defaultLocationName
     self.defaultLatitude = defaultLatitude
     self.defaultLongitude = defaultLongitude
@@ -496,6 +507,8 @@ class UserAttributes(object):
     self.customerProfileId = customerProfileId
     self.referralProof = referralProof
     self.educationalDiscount = educationalDiscount
+    self.businessAddress = businessAddress
+    self.hideSponsorBilling = hideSponsorBilling
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -651,6 +664,16 @@ class UserAttributes(object):
           self.educationalDiscount = iprot.readBool();
         else:
           iprot.skip(ftype)
+      elif fid == 30:
+        if ftype == TType.STRING:
+          self.businessAddress = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 31:
+        if ftype == TType.BOOL:
+          self.hideSponsorBilling = iprot.readBool();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -775,6 +798,14 @@ class UserAttributes(object):
       oprot.writeFieldBegin('educationalDiscount', TType.BOOL, 29)
       oprot.writeBool(self.educationalDiscount)
       oprot.writeFieldEnd()
+    if self.businessAddress != None:
+      oprot.writeFieldBegin('businessAddress', TType.STRING, 30)
+      oprot.writeString(self.businessAddress)
+      oprot.writeFieldEnd()
+    if self.hideSponsorBilling != None:
+      oprot.writeFieldBegin('hideSponsorBilling', TType.BOOL, 31)
+      oprot.writeBool(self.hideSponsorBilling)
+      oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
 
@@ -792,7 +823,7 @@ class UserAttributes(object):
 class Accounting(object):
   """
    This represents the bookkeeping information for the user's subscription.
-   
+  
   <dl>
    <dt>uploadLimit</dt>
      <dd>The number of bytes that can be uploaded to the account
@@ -860,6 +891,12 @@ class Accounting(object):
      <dd>The number number identifying the
      recurring subscription used to make the recurring charges.
      </dd>
+   <dt>lastRequestedCharge</dt>
+     <dd>Date charge last attempted</dd>
+   <dt>currency</dt>
+     <dd>ISO 4217 currency code</dd>
+   <dt>unitPrice</dt>
+     <dd>charge in the smallest unit of the currency (e.g. cents for USD)</dd>
    </dl>
   
   Attributes:
@@ -879,6 +916,8 @@ class Accounting(object):
    - updated
    - premiumSubscriptionNumber
    - lastRequestedCharge
+   - currency
+   - unitPrice
   """
 
   thrift_spec = (
@@ -900,9 +939,11 @@ class Accounting(object):
     None, # 15
     (16, TType.STRING, 'premiumSubscriptionNumber', None, None, ), # 16
     (17, TType.I64, 'lastRequestedCharge', None, None, ), # 17
+    (18, TType.STRING, 'currency', None, None, ), # 18
+    (19, TType.I32, 'unitPrice', None, None, ), # 19
   )
 
-  def __init__(self, uploadLimit=None, uploadLimitEnd=None, uploadLimitNextMonth=None, premiumServiceStatus=None, premiumOrderNumber=None, premiumCommerceService=None, premiumServiceStart=None, premiumServiceSKU=None, lastSuccessfulCharge=None, lastFailedCharge=None, lastFailedChargeReason=None, nextPaymentDue=None, premiumLockUntil=None, updated=None, premiumSubscriptionNumber=None, lastRequestedCharge=None,):
+  def __init__(self, uploadLimit=None, uploadLimitEnd=None, uploadLimitNextMonth=None, premiumServiceStatus=None, premiumOrderNumber=None, premiumCommerceService=None, premiumServiceStart=None, premiumServiceSKU=None, lastSuccessfulCharge=None, lastFailedCharge=None, lastFailedChargeReason=None, nextPaymentDue=None, premiumLockUntil=None, updated=None, premiumSubscriptionNumber=None, lastRequestedCharge=None, currency=None, unitPrice=None,):
     self.uploadLimit = uploadLimit
     self.uploadLimitEnd = uploadLimitEnd
     self.uploadLimitNextMonth = uploadLimitNextMonth
@@ -919,6 +960,8 @@ class Accounting(object):
     self.updated = updated
     self.premiumSubscriptionNumber = premiumSubscriptionNumber
     self.lastRequestedCharge = lastRequestedCharge
+    self.currency = currency
+    self.unitPrice = unitPrice
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -1009,6 +1052,16 @@ class Accounting(object):
           self.lastRequestedCharge = iprot.readI64();
         else:
           iprot.skip(ftype)
+      elif fid == 18:
+        if ftype == TType.STRING:
+          self.currency = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 19:
+        if ftype == TType.I32:
+          self.unitPrice = iprot.readI32();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -1082,6 +1135,14 @@ class Accounting(object):
     if self.lastRequestedCharge != None:
       oprot.writeFieldBegin('lastRequestedCharge', TType.I64, 17)
       oprot.writeI64(self.lastRequestedCharge)
+      oprot.writeFieldEnd()
+    if self.currency != None:
+      oprot.writeFieldBegin('currency', TType.STRING, 18)
+      oprot.writeString(self.currency)
+      oprot.writeFieldEnd()
+    if self.unitPrice != None:
+      oprot.writeFieldBegin('unitPrice', TType.I32, 19)
+      oprot.writeI32(self.unitPrice)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -1424,7 +1485,7 @@ class Tag(object):
   
    <dt>parentGuid</dt>
      <dd>If this is set, then this is the GUID of the tag that
-     holds this tag within the tag organizational heirarchy.  If this is
+     holds this tag within the tag organizational hierarchy.  If this is
      not set, then the tag has no parent and it is a "top level" tag.
      Cycles are not allowed (e.g. a->parent->parent == a) and will be
      rejected by the service.
@@ -1532,6 +1593,120 @@ class Tag(object):
   def __ne__(self, other):
     return not (self == other)
 
+class LazyMap(object):
+  """
+  A structure that wraps a map of name/value pairs whose values are not
+  always present in the structure in order to reduce space when obtaining
+  batches of entities that contain the map.
+  
+  When the server provides the client with a LazyMap, it will fill in either
+  the keysOnly field or the fullMap field, but never both, based on the API
+  and parameters.
+  
+  When a client provides a LazyMap to the server as part of an update to
+  an object, the server will only update the LazyMap if the fullMap field is
+  set. If the fullMap field is not set, the server will not make any changes
+  to the map.
+  
+  Check the API documentation of the individual calls involving the LazyMap
+  for full details including the constraints of the names and values of the
+  map.
+  
+  <dl>
+  <dt>keysOnly</dt>
+    <dd>The set of keys for the map.  This field is ignored by the
+        server when set.
+    </dd>
+  
+  <dt>fullMap</dt>
+    <dd>The complete map, including all keys and values.
+    </dd>
+  </dl>
+  
+  Attributes:
+   - keysOnly
+   - fullMap
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.SET, 'keysOnly', (TType.STRING,None), None, ), # 1
+    (2, TType.MAP, 'fullMap', (TType.STRING,None,TType.STRING,None), None, ), # 2
+  )
+
+  def __init__(self, keysOnly=None, fullMap=None,):
+    self.keysOnly = keysOnly
+    self.fullMap = fullMap
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.SET:
+          self.keysOnly = set()
+          (_etype17, _size14) = iprot.readSetBegin()
+          for _i18 in xrange(_size14):
+            _elem19 = iprot.readString();
+            self.keysOnly.add(_elem19)
+          iprot.readSetEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.MAP:
+          self.fullMap = {}
+          (_ktype21, _vtype22, _size20 ) = iprot.readMapBegin() 
+          for _i24 in xrange(_size20):
+            _key25 = iprot.readString();
+            _val26 = iprot.readString();
+            self.fullMap[_key25] = _val26
+          iprot.readMapEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('LazyMap')
+    if self.keysOnly != None:
+      oprot.writeFieldBegin('keysOnly', TType.SET, 1)
+      oprot.writeSetBegin(TType.STRING, len(self.keysOnly))
+      for iter27 in self.keysOnly:
+        oprot.writeString(iter27)
+      oprot.writeSetEnd()
+      oprot.writeFieldEnd()
+    if self.fullMap != None:
+      oprot.writeFieldBegin('fullMap', TType.MAP, 2)
+      oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.fullMap))
+      for kiter28,viter29 in self.fullMap.items():
+        oprot.writeString(kiter28)
+        oprot.writeString(viter29)
+      oprot.writeMapEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
 class ResourceAttributes(object):
   """
   Structure holding the optional attributes of a Resource
@@ -1591,10 +1766,27 @@ class ResourceAttributes(object):
     </dd>
   
   <dt>attachment</dt>
-    <dd>this will be true if the resource is a Premium file attachment.  This
-    will be available within the search grammar so that you can identify
-    notes that contain attachments.
+    <dd>this will be true if the resource should be displayed as an attachment,
+    or false if the resource should be displayed inline (if possible).
     </dd>
+  
+  <dt>applicationData</dt>
+  <dd>Provides a location for applications to store a relatively small
+  (4kb) blob of data associated with a Resource that is not visible to the user
+  and that is opaque to the Evernote service. A single application may use at most
+  one entry in this map, using its API consumer key as the map key. See the
+  documentation for LazyMap for a description of when the actual map values
+  are returned by the service.
+  <p>To safely add or modify your application's entry in the map, use
+  NoteStore.setResourceApplicationDataEntry. To safely remove your application's
+  entry from the map, use NoteStore.unsetResourceApplicationDataEntry.</p>
+  Minimum length of a name (key): EDAM_APPLICATIONDATA_NAME_LEN_MIN
+  <br/>
+  Sum max size of key and value: EDAM_APPLICATIONDATA_ENTRY_LEN_MAX
+  <br/>
+  Syntax regex for name (key): EDAM_APPLICATIONDATA_NAME_REGEX
+  </dd>
+  
   </dl>
   
   Attributes:
@@ -1609,6 +1801,7 @@ class ResourceAttributes(object):
    - recoType
    - fileName
    - attachment
+   - applicationData
   """
 
   thrift_spec = (
@@ -1624,9 +1817,10 @@ class ResourceAttributes(object):
     (9, TType.STRING, 'recoType', None, None, ), # 9
     (10, TType.STRING, 'fileName', None, None, ), # 10
     (11, TType.BOOL, 'attachment', None, None, ), # 11
+    (12, TType.STRUCT, 'applicationData', (LazyMap, LazyMap.thrift_spec), None, ), # 12
   )
 
-  def __init__(self, sourceURL=None, timestamp=None, latitude=None, longitude=None, altitude=None, cameraMake=None, cameraModel=None, clientWillIndex=None, recoType=None, fileName=None, attachment=None,):
+  def __init__(self, sourceURL=None, timestamp=None, latitude=None, longitude=None, altitude=None, cameraMake=None, cameraModel=None, clientWillIndex=None, recoType=None, fileName=None, attachment=None, applicationData=None,):
     self.sourceURL = sourceURL
     self.timestamp = timestamp
     self.latitude = latitude
@@ -1638,6 +1832,7 @@ class ResourceAttributes(object):
     self.recoType = recoType
     self.fileName = fileName
     self.attachment = attachment
+    self.applicationData = applicationData
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -1703,6 +1898,12 @@ class ResourceAttributes(object):
           self.attachment = iprot.readBool();
         else:
           iprot.skip(ftype)
+      elif fid == 12:
+        if ftype == TType.STRUCT:
+          self.applicationData = LazyMap()
+          self.applicationData.read(iprot)
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -1756,6 +1957,10 @@ class ResourceAttributes(object):
     if self.attachment != None:
       oprot.writeFieldBegin('attachment', TType.BOOL, 11)
       oprot.writeBool(self.attachment)
+      oprot.writeFieldEnd()
+    if self.applicationData != None:
+      oprot.writeFieldBegin('applicationData', TType.STRUCT, 12)
+      self.applicationData.write(oprot)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -2071,13 +2276,14 @@ class NoteAttributes(object):
   
   <dt>source</dt>
     <dd>the method that the note was added to the account, if the
-    note wasn't directly authored in an Evernote client.
+    note wasn't directly authored in an Evernote desktop client.
     <br/>
     Length:  EDAM_ATTRIBUTE_LEN_MIN - EDAM_ATTRIBUTE_LEN_MAX
     </dd>
   
   <dt>sourceURL</dt>
-    <dd>the original location where the resource was hosted
+    <dd>the original location where the resource was hosted. For web clips,
+    this will be the URL of the page that was clipped.
     <br/>
     Length:  EDAM_ATTRIBUTE_LEN_MIN - EDAM_ATTRIBUTE_LEN_MAX
     </dd>
@@ -2089,6 +2295,88 @@ class NoteAttributes(object):
     <br/>
     Length:  EDAM_ATTRIBUTE_LEN_MIN - EDAM_ATTRIBUTE_LEN_MAX
     </dd>
+  
+  <dt>shareDate</dt>
+   <dd>The date and time when this note was directly shared via its own URL.
+   This is only set on notes that were individually shared - it is independent
+   of any notebook-level sharing of the containing notepbook. This field
+   is treated as "read-only" for clients; the server will ignore changes
+   to this field from an external client.
+   </dd>
+  
+  </dl>
+  <dt>taskDate</dt>
+  <dd>The date and time when a note was set to be a task. The value
+  is a read/write attirubte that is used by applications to define
+  the presentation order of notes that are treated as tasks. Clearing
+  the taskDate removes the task behaviors. Applications are
+  discouraged from displaying the time portion of a task.
+  </dd>
+  
+  <dt>taskCompleteDate</dt>
+  <dd>The date and time when a user marked a task note as
+  complete. Users typically do not manually set this value, but like
+  createDate, it is automatically set when the user marks the note as
+  complete. Once a task is marked as complete reminders associated
+  with due dates are no longer invoked.
+  </dd>
+  
+  <dt>taskDueDate</dt>
+  <dd>The date and time a user as selected for a note to be due. This
+  is an optional attribute of a task note (not all tasks need to have
+  a due date). Due dates trigger reminders and
+  notifications. Notifications and reminders are not tiggered if the
+  taskCompleteDate is set.</dd>
+  
+  <dt>placeName</dt>
+  <dd>Allows the user to assign a human-readable location name associated
+  with a note. Users may assign values like 'Home' and 'Work'. Place
+  names may also be populated with values from geonames database
+  (e.g., a restaurant name). Applications are encouraged to normalize values
+  so that grouping values by place name provides a useful result. Applications
+  MUST NOT automatically add place name values based on geolocation without
+  confirmation from the user; that is, the value in this field should be
+  more useful than a simple automated lookup based on the note's latitude
+  and longitude.</dd>
+  
+  <dt>contentClass</dt>
+  <dd>The class (or type) of note. This field is used to indicate to
+  clients that special structured information is represented within
+  the note such that special rules apply when making
+  modifications. If contentClass is set and the client
+  application does not specifically support the specified class,
+  the client MUST treat the note as read-only. In this case, the
+  client MAY modify the note's notebook and tags via the
+  Note.notebookGuid and Note.tagGuids fields.
+  <p>Applications should set contentClass only when they are creating notes
+  that contain structured information that needs to be maintained in order
+  for the user to be able to use the note within that application.
+  Setting contentClass makes a note read-only in other applications, so
+  there is a trade-off when an application chooses to use contentClass.
+  Applications that set contentClass when creating notes must use a contentClass
+  string of the form <i>CompanyName.ApplicationName</i> to ensure uniqueness.</p>
+  Length restrictions: EDAM_NOTE_CONTENT_CLASS_LEN_MIN, EDAM_NOTE_CONTENT_CLASS_LEN_MAX
+  <br/>
+  Regex: EDAM_NOTE_CONTENT_CLASS_REGEX
+  </dd>
+  
+  <dt>applicationData</dt>
+  <dd>Provides a location for applications to store a relatively small
+  (4kb) blob of data that is not meant to be visible to the user and
+  that is opaque to the Evernote service. A single application may use at most
+  one entry in this map, using its API consumer key as the map key. See the
+  documentation for LazyMap for a description of when the actual map values
+  are returned by the service.
+  <p>To safely add or modify your application's entry in the map, use
+  NoteStore.setNoteApplicationDataEntry. To safely remove your application's
+  entry from the map, use NoteStore.unsetNoteApplicationDataEntry.</p>
+  Minimum length of a name (key): EDAM_APPLICATIONDATA_NAME_LEN_MIN
+  <br/>
+  Sum max size of key and value: EDAM_APPLICATIONDATA_ENTRY_LEN_MAX
+  <br/>
+  Syntax regex for name (key): EDAM_APPLICATIONDATA_NAME_REGEX
+  </dd>
+  
   </dl>
   
   Attributes:
@@ -2100,6 +2388,13 @@ class NoteAttributes(object):
    - source
    - sourceURL
    - sourceApplication
+   - shareDate
+   - taskDate
+   - taskCompleteDate
+   - taskDueDate
+   - placeName
+   - contentClass
+   - applicationData
   """
 
   thrift_spec = (
@@ -2120,9 +2415,16 @@ class NoteAttributes(object):
     (14, TType.STRING, 'source', None, None, ), # 14
     (15, TType.STRING, 'sourceURL', None, None, ), # 15
     (16, TType.STRING, 'sourceApplication', None, None, ), # 16
+    (17, TType.I64, 'shareDate', None, None, ), # 17
+    (18, TType.I64, 'taskDate', None, None, ), # 18
+    (19, TType.I64, 'taskCompleteDate', None, None, ), # 19
+    (20, TType.I64, 'taskDueDate', None, None, ), # 20
+    (21, TType.STRING, 'placeName', None, None, ), # 21
+    (22, TType.STRING, 'contentClass', None, None, ), # 22
+    (23, TType.STRUCT, 'applicationData', (LazyMap, LazyMap.thrift_spec), None, ), # 23
   )
 
-  def __init__(self, subjectDate=None, latitude=None, longitude=None, altitude=None, author=None, source=None, sourceURL=None, sourceApplication=None,):
+  def __init__(self, subjectDate=None, latitude=None, longitude=None, altitude=None, author=None, source=None, sourceURL=None, sourceApplication=None, shareDate=None, taskDate=None, taskCompleteDate=None, taskDueDate=None, placeName=None, contentClass=None, applicationData=None,):
     self.subjectDate = subjectDate
     self.latitude = latitude
     self.longitude = longitude
@@ -2131,6 +2433,13 @@ class NoteAttributes(object):
     self.source = source
     self.sourceURL = sourceURL
     self.sourceApplication = sourceApplication
+    self.shareDate = shareDate
+    self.taskDate = taskDate
+    self.taskCompleteDate = taskCompleteDate
+    self.taskDueDate = taskDueDate
+    self.placeName = placeName
+    self.contentClass = contentClass
+    self.applicationData = applicationData
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -2181,6 +2490,42 @@ class NoteAttributes(object):
           self.sourceApplication = iprot.readString();
         else:
           iprot.skip(ftype)
+      elif fid == 17:
+        if ftype == TType.I64:
+          self.shareDate = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      elif fid == 18:
+        if ftype == TType.I64:
+          self.taskDate = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      elif fid == 19:
+        if ftype == TType.I64:
+          self.taskCompleteDate = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      elif fid == 20:
+        if ftype == TType.I64:
+          self.taskDueDate = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      elif fid == 21:
+        if ftype == TType.STRING:
+          self.placeName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 22:
+        if ftype == TType.STRING:
+          self.contentClass = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 23:
+        if ftype == TType.STRUCT:
+          self.applicationData = LazyMap()
+          self.applicationData.read(iprot)
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -2222,6 +2567,34 @@ class NoteAttributes(object):
     if self.sourceApplication != None:
       oprot.writeFieldBegin('sourceApplication', TType.STRING, 16)
       oprot.writeString(self.sourceApplication)
+      oprot.writeFieldEnd()
+    if self.shareDate != None:
+      oprot.writeFieldBegin('shareDate', TType.I64, 17)
+      oprot.writeI64(self.shareDate)
+      oprot.writeFieldEnd()
+    if self.taskDate != None:
+      oprot.writeFieldBegin('taskDate', TType.I64, 18)
+      oprot.writeI64(self.taskDate)
+      oprot.writeFieldEnd()
+    if self.taskCompleteDate != None:
+      oprot.writeFieldBegin('taskCompleteDate', TType.I64, 19)
+      oprot.writeI64(self.taskCompleteDate)
+      oprot.writeFieldEnd()
+    if self.taskDueDate != None:
+      oprot.writeFieldBegin('taskDueDate', TType.I64, 20)
+      oprot.writeI64(self.taskDueDate)
+      oprot.writeFieldEnd()
+    if self.placeName != None:
+      oprot.writeFieldBegin('placeName', TType.STRING, 21)
+      oprot.writeString(self.placeName)
+      oprot.writeFieldEnd()
+    if self.contentClass != None:
+      oprot.writeFieldBegin('contentClass', TType.STRING, 22)
+      oprot.writeString(self.contentClass)
+      oprot.writeFieldEnd()
+    if self.applicationData != None:
+      oprot.writeFieldBegin('applicationData', TType.STRUCT, 23)
+      self.applicationData.write(oprot)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()
@@ -2488,21 +2861,21 @@ class Note(object):
       elif fid == 12:
         if ftype == TType.LIST:
           self.tagGuids = []
-          (_etype17, _size14) = iprot.readListBegin()
-          for _i18 in xrange(_size14):
-            _elem19 = iprot.readString();
-            self.tagGuids.append(_elem19)
+          (_etype33, _size30) = iprot.readListBegin()
+          for _i34 in xrange(_size30):
+            _elem35 = iprot.readString();
+            self.tagGuids.append(_elem35)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
       elif fid == 13:
         if ftype == TType.LIST:
           self.resources = []
-          (_etype23, _size20) = iprot.readListBegin()
-          for _i24 in xrange(_size20):
-            _elem25 = Resource()
-            _elem25.read(iprot)
-            self.resources.append(_elem25)
+          (_etype39, _size36) = iprot.readListBegin()
+          for _i40 in xrange(_size36):
+            _elem41 = Resource()
+            _elem41.read(iprot)
+            self.resources.append(_elem41)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -2515,10 +2888,10 @@ class Note(object):
       elif fid == 15:
         if ftype == TType.LIST:
           self.tagNames = []
-          (_etype29, _size26) = iprot.readListBegin()
-          for _i30 in xrange(_size26):
-            _elem31 = iprot.readString();
-            self.tagNames.append(_elem31)
+          (_etype45, _size42) = iprot.readListBegin()
+          for _i46 in xrange(_size42):
+            _elem47 = iprot.readString();
+            self.tagNames.append(_elem47)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -2579,15 +2952,15 @@ class Note(object):
     if self.tagGuids != None:
       oprot.writeFieldBegin('tagGuids', TType.LIST, 12)
       oprot.writeListBegin(TType.STRING, len(self.tagGuids))
-      for iter32 in self.tagGuids:
-        oprot.writeString(iter32)
+      for iter48 in self.tagGuids:
+        oprot.writeString(iter48)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.resources != None:
       oprot.writeFieldBegin('resources', TType.LIST, 13)
       oprot.writeListBegin(TType.STRUCT, len(self.resources))
-      for iter33 in self.resources:
-        iter33.write(oprot)
+      for iter49 in self.resources:
+        iter49.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.attributes != None:
@@ -2597,8 +2970,8 @@ class Note(object):
     if self.tagNames != None:
       oprot.writeFieldBegin('tagNames', TType.LIST, 15)
       oprot.writeListBegin(TType.STRING, len(self.tagNames))
-      for iter34 in self.tagNames:
-        oprot.writeString(iter34)
+      for iter50 in self.tagNames:
+        oprot.writeString(iter50)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
@@ -2938,10 +3311,10 @@ class Notebook(object):
       elif fid == 13:
         if ftype == TType.LIST:
           self.sharedNotebookIds = []
-          (_etype38, _size35) = iprot.readListBegin()
-          for _i39 in xrange(_size35):
-            _elem40 = iprot.readI64();
-            self.sharedNotebookIds.append(_elem40)
+          (_etype54, _size51) = iprot.readListBegin()
+          for _i55 in xrange(_size51):
+            _elem56 = iprot.readI64();
+            self.sharedNotebookIds.append(_elem56)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -2994,8 +3367,8 @@ class Notebook(object):
     if self.sharedNotebookIds != None:
       oprot.writeFieldBegin('sharedNotebookIds', TType.LIST, 13)
       oprot.writeListBegin(TType.I64, len(self.sharedNotebookIds))
-      for iter41 in self.sharedNotebookIds:
-        oprot.writeI64(iter41)
+      for iter57 in self.sharedNotebookIds:
+        oprot.writeI64(iter57)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
@@ -3215,6 +3588,10 @@ class Ad(object):
     ad should be displayed in the daily set of ads, relative to a base
     frequency of 1.0.  I.e. an ad with a frequency of 3.0 should be displayed
     three times more frequently than an ad with a frequency of 1.0.</dd>
+  
+    <dt>openInTrunk</dt>
+    <dd>If true, the ad should be opened in the embedded Trunk window by
+    clients with Trunk support.</dd>
   </dl>
   
   Attributes:
@@ -3230,6 +3607,7 @@ class Ad(object):
    - imageMime
    - html
    - displayFrequency
+   - openInTrunk
   """
 
   thrift_spec = (
@@ -3246,9 +3624,10 @@ class Ad(object):
     (10, TType.STRING, 'imageMime', None, None, ), # 10
     (11, TType.STRING, 'html', None, None, ), # 11
     (12, TType.DOUBLE, 'displayFrequency', None, None, ), # 12
+    (13, TType.BOOL, 'openInTrunk', None, None, ), # 13
   )
 
-  def __init__(self, id=None, width=None, height=None, advertiserName=None, imageUrl=None, destinationUrl=None, displaySeconds=None, score=None, image=None, imageMime=None, html=None, displayFrequency=None,):
+  def __init__(self, id=None, width=None, height=None, advertiserName=None, imageUrl=None, destinationUrl=None, displaySeconds=None, score=None, image=None, imageMime=None, html=None, displayFrequency=None, openInTrunk=None,):
     self.id = id
     self.width = width
     self.height = height
@@ -3261,6 +3640,7 @@ class Ad(object):
     self.imageMime = imageMime
     self.html = html
     self.displayFrequency = displayFrequency
+    self.openInTrunk = openInTrunk
 
   def read(self, iprot):
     if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
@@ -3331,6 +3711,11 @@ class Ad(object):
           self.displayFrequency = iprot.readDouble();
         else:
           iprot.skip(ftype)
+      elif fid == 13:
+        if ftype == TType.BOOL:
+          self.openInTrunk = iprot.readBool();
+        else:
+          iprot.skip(ftype)
       else:
         iprot.skip(ftype)
       iprot.readFieldEnd()
@@ -3388,6 +3773,10 @@ class Ad(object):
     if self.displayFrequency != None:
       oprot.writeFieldBegin('displayFrequency', TType.DOUBLE, 12)
       oprot.writeDouble(self.displayFrequency)
+      oprot.writeFieldEnd()
+    if self.openInTrunk != None:
+      oprot.writeFieldBegin('openInTrunk', TType.BOOL, 13)
+      oprot.writeBool(self.openInTrunk)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()

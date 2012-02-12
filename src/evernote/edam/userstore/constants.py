@@ -9,5 +9,5 @@ from ttypes import *
 
 EDAM_VERSION_MAJOR = 1
 
-EDAM_VERSION_MINOR = 17
+EDAM_VERSION_MINOR = 20
 

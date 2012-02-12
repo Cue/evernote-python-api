@@ -94,10 +94,8 @@ class Iface(object):
     
     @return
       The result of the authentication.  If the authentication was successful,
-      the AuthenticationResult.user field will be set, but that User's
-      'attributes' will not be set.  To retrieve the full information about
-      the User, including its UserAttributes, make a separate call to
-      UserStore.getUser() with the authentication from this call.
+      the AuthenticationResult.user field will be set with the full information
+      about the User.
     
     @throws EDAMUserException <ul>
       <li> DATA_REQUIRED "username" - username is empty
@@ -108,6 +106,7 @@ class Iface(object):
       <li> INVALID_AUTH "consumerKey" - consumerKey is not authorized
       <li> INVALID_AUTH "consumerSecret" - consumerSecret is incorrect
       <li> PERMISSION_DENIED "User.active" - user account is closed
+      <li> PERMISSION_DENIED "User.tooManyFailuresTryAgainLater" - user has failed authentication too often
     </ul>
     
     Parameters:
@@ -161,6 +160,16 @@ class Iface(object):
     
     Parameters:
      - username
+    """
+    pass
+
+  def getPremiumInfo(self, authenticationToken):
+    """
+    Returns information regarding a user's Premium account corresponding to the provided authentication token,
+    or throws an exception if this token is not valid.
+    
+    Parameters:
+     - authenticationToken
     """
     pass
 
@@ -275,10 +284,8 @@ class Client(Iface):
     
     @return
       The result of the authentication.  If the authentication was successful,
-      the AuthenticationResult.user field will be set, but that User's
-      'attributes' will not be set.  To retrieve the full information about
-      the User, including its UserAttributes, make a separate call to
-      UserStore.getUser() with the authentication from this call.
+      the AuthenticationResult.user field will be set with the full information
+      about the User.
     
     @throws EDAMUserException <ul>
       <li> DATA_REQUIRED "username" - username is empty
@@ -289,6 +296,7 @@ class Client(Iface):
       <li> INVALID_AUTH "consumerKey" - consumerKey is not authorized
       <li> INVALID_AUTH "consumerSecret" - consumerSecret is incorrect
       <li> PERMISSION_DENIED "User.active" - user account is closed
+      <li> PERMISSION_DENIED "User.tooManyFailuresTryAgainLater" - user has failed authentication too often
     </ul>
     
     Parameters:
@@ -458,6 +466,43 @@ class Client(Iface):
       raise result.userException
     raise TApplicationException(TApplicationException.MISSING_RESULT, "getPublicUserInfo failed: unknown result");
 
+  def getPremiumInfo(self, authenticationToken):
+    """
+    Returns information regarding a user's Premium account corresponding to the provided authentication token,
+    or throws an exception if this token is not valid.
+    
+    Parameters:
+     - authenticationToken
+    """
+    self.send_getPremiumInfo(authenticationToken)
+    return self.recv_getPremiumInfo()
+
+  def send_getPremiumInfo(self, authenticationToken):
+    self._oprot.writeMessageBegin('getPremiumInfo', TMessageType.CALL, self._seqid)
+    args = getPremiumInfo_args()
+    args.authenticationToken = authenticationToken
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_getPremiumInfo(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = getPremiumInfo_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "getPremiumInfo failed: unknown result");
+
 
 class Processor(Iface, TProcessor):
   def __init__(self, handler):
@@ -468,6 +513,7 @@ class Processor(Iface, TProcessor):
     self._processMap["refreshAuthentication"] = Processor.process_refreshAuthentication
     self._processMap["getUser"] = Processor.process_getUser
     self._processMap["getPublicUserInfo"] = Processor.process_getPublicUserInfo
+    self._processMap["getPremiumInfo"] = Processor.process_getPremiumInfo
 
   def process(self, iprot, oprot):
     (name, type, seqid) = iprot.readMessageBegin()
@@ -561,6 +607,22 @@ class Processor(Iface, TProcessor):
     oprot.writeMessageEnd()
     oprot.trans.flush()
 
+  def process_getPremiumInfo(self, seqid, iprot, oprot):
+    args = getPremiumInfo_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = getPremiumInfo_result()
+    try:
+      result.success = self._handler.getPremiumInfo(args.authenticationToken)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    oprot.writeMessageBegin("getPremiumInfo", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
 
 # HELPER FUNCTIONS AND STRUCTURES
 
@@ -576,7 +638,7 @@ class checkVersion_args(object):
     None, # 0
     (1, TType.STRING, 'clientName', None, None, ), # 1
     (2, TType.I16, 'edamVersionMajor', None, 1, ), # 2
-    (3, TType.I16, 'edamVersionMinor', None, 17, ), # 3
+    (3, TType.I16, 'edamVersionMinor', None, 20, ), # 3
   )
 
   def __init__(self, clientName=None, edamVersionMajor=thrift_spec[2][4], edamVersionMinor=thrift_spec[3][4],):
@@ -1285,6 +1347,144 @@ class getPublicUserInfo_result(object):
     if self.userException != None:
       oprot.writeFieldBegin('userException', TType.STRUCT, 3)
       self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getPremiumInfo_args(object):
+  """
+  Attributes:
+   - authenticationToken
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+  )
+
+  def __init__(self, authenticationToken=None,):
+    self.authenticationToken = authenticationToken
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getPremiumInfo_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getPremiumInfo_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+  """
+
+  thrift_spec = (
+    (0, TType.STRUCT, 'success', (PremiumInfo, PremiumInfo.thrift_spec), None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRUCT:
+          self.success = PremiumInfo()
+          self.success.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getPremiumInfo_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()

@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name = 'evernote',
-    version = '1.17',
+    version = '1.20',
     author = 'Evernote Corporation',
     author_email = 'en-support@evernote.com',
     url = 'http://www.evernote.com/about/developer/api/',

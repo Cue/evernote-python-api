@@ -17,6 +17,26 @@ except:
   fastbinary = None
 
 
+class SponsoredGroupRole(object):
+  """
+  Enumeration of Sponsored Group Roles
+  """
+  GROUP_MEMBER = 1
+  GROUP_ADMIN = 2
+  GROUP_OWNER = 3
+
+  _VALUES_TO_NAMES = {
+    1: "GROUP_MEMBER",
+    2: "GROUP_ADMIN",
+    3: "GROUP_OWNER",
+  }
+
+  _NAMES_TO_VALUES = {
+    "GROUP_MEMBER": 1,
+    "GROUP_ADMIN": 2,
+    "GROUP_OWNER": 3,
+  }
+
 class PublicUserInfo(object):
   """
    This structure is used to provide publicly-available user information
@@ -115,6 +135,216 @@ class PublicUserInfo(object):
     if self.username != None:
       oprot.writeFieldBegin('username', TType.STRING, 4)
       oprot.writeString(self.username)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class PremiumInfo(object):
+  """
+   This structure is used to provide information about a user's Premium account.
+  <dl>
+   <dt>currentTime:</dt>
+     <dd>
+     The server-side date and time when this data was generated.
+     </dd>
+   <dt>premium:</dt>
+     <dd>
+  	 True if the user's account is Premium.
+     </dd>
+   <dt>premiumRecurring</dt>
+     <dd>
+     True if the user's account is Premium and has a recurring payment method.
+     </dd>
+   <dt>premiumExpirationDate:</dt>
+     <dd>
+     The date when the user's Premium account expires, or the date when the user's
+     account will be charged if it has a recurring payment method.
+     </dd>
+   <dt>premiumExtendable:</dt>
+     <dd>
+     True if the user is eligible for purchasing Premium account extensions.
+     </dd>
+   <dt>premiumPending:</dt>
+     <dd>
+     True if the user's Premium account is pending payment confirmation
+     </dd>
+   <dt>premiumCancellationPending:</dt>
+     <dd>
+     True if the user has requested that no further charges to be made; the Premium
+     account will remain active until it expires.
+     </dd>
+   <dt>canPurchaseUploadAllowance:</dt>
+     <dd>
+     True if the user is eligible for purchasing additional upload allowance.
+     </dd>
+   <dt>sponsoredGroupName:</dt>
+     <dd>
+     The name of the sponsored group that the user is part of.
+     </dd>
+   <dt>sponsoredGroupRole:</dt>
+     <dd>
+     The role of the user within a sponsored group.
+     </dd>
+   </dl>
+  
+  Attributes:
+   - currentTime
+   - premium
+   - premiumRecurring
+   - premiumExpirationDate
+   - premiumExtendable
+   - premiumPending
+   - premiumCancellationPending
+   - canPurchaseUploadAllowance
+   - sponsoredGroupName
+   - sponsoredGroupRole
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.I64, 'currentTime', None, None, ), # 1
+    (2, TType.BOOL, 'premium', None, None, ), # 2
+    (3, TType.BOOL, 'premiumRecurring', None, None, ), # 3
+    (4, TType.I64, 'premiumExpirationDate', None, None, ), # 4
+    (5, TType.BOOL, 'premiumExtendable', None, None, ), # 5
+    (6, TType.BOOL, 'premiumPending', None, None, ), # 6
+    (7, TType.BOOL, 'premiumCancellationPending', None, None, ), # 7
+    (8, TType.BOOL, 'canPurchaseUploadAllowance', None, None, ), # 8
+    (9, TType.STRING, 'sponsoredGroupName', None, None, ), # 9
+    (10, TType.I32, 'sponsoredGroupRole', None, None, ), # 10
+  )
+
+  def __init__(self, currentTime=None, premium=None, premiumRecurring=None, premiumExpirationDate=None, premiumExtendable=None, premiumPending=None, premiumCancellationPending=None, canPurchaseUploadAllowance=None, sponsoredGroupName=None, sponsoredGroupRole=None,):
+    self.currentTime = currentTime
+    self.premium = premium
+    self.premiumRecurring = premiumRecurring
+    self.premiumExpirationDate = premiumExpirationDate
+    self.premiumExtendable = premiumExtendable
+    self.premiumPending = premiumPending
+    self.premiumCancellationPending = premiumCancellationPending
+    self.canPurchaseUploadAllowance = canPurchaseUploadAllowance
+    self.sponsoredGroupName = sponsoredGroupName
+    self.sponsoredGroupRole = sponsoredGroupRole
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.I64:
+          self.currentTime = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.BOOL:
+          self.premium = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.BOOL:
+          self.premiumRecurring = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.I64:
+          self.premiumExpirationDate = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.BOOL:
+          self.premiumExtendable = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 6:
+        if ftype == TType.BOOL:
+          self.premiumPending = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 7:
+        if ftype == TType.BOOL:
+          self.premiumCancellationPending = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 8:
+        if ftype == TType.BOOL:
+          self.canPurchaseUploadAllowance = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 9:
+        if ftype == TType.STRING:
+          self.sponsoredGroupName = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 10:
+        if ftype == TType.I32:
+          self.sponsoredGroupRole = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('PremiumInfo')
+    if self.currentTime != None:
+      oprot.writeFieldBegin('currentTime', TType.I64, 1)
+      oprot.writeI64(self.currentTime)
+      oprot.writeFieldEnd()
+    if self.premium != None:
+      oprot.writeFieldBegin('premium', TType.BOOL, 2)
+      oprot.writeBool(self.premium)
+      oprot.writeFieldEnd()
+    if self.premiumRecurring != None:
+      oprot.writeFieldBegin('premiumRecurring', TType.BOOL, 3)
+      oprot.writeBool(self.premiumRecurring)
+      oprot.writeFieldEnd()
+    if self.premiumExpirationDate != None:
+      oprot.writeFieldBegin('premiumExpirationDate', TType.I64, 4)
+      oprot.writeI64(self.premiumExpirationDate)
+      oprot.writeFieldEnd()
+    if self.premiumExtendable != None:
+      oprot.writeFieldBegin('premiumExtendable', TType.BOOL, 5)
+      oprot.writeBool(self.premiumExtendable)
+      oprot.writeFieldEnd()
+    if self.premiumPending != None:
+      oprot.writeFieldBegin('premiumPending', TType.BOOL, 6)
+      oprot.writeBool(self.premiumPending)
+      oprot.writeFieldEnd()
+    if self.premiumCancellationPending != None:
+      oprot.writeFieldBegin('premiumCancellationPending', TType.BOOL, 7)
+      oprot.writeBool(self.premiumCancellationPending)
+      oprot.writeFieldEnd()
+    if self.canPurchaseUploadAllowance != None:
+      oprot.writeFieldBegin('canPurchaseUploadAllowance', TType.BOOL, 8)
+      oprot.writeBool(self.canPurchaseUploadAllowance)
+      oprot.writeFieldEnd()
+    if self.sponsoredGroupName != None:
+      oprot.writeFieldBegin('sponsoredGroupName', TType.STRING, 9)
+      oprot.writeString(self.sponsoredGroupName)
+      oprot.writeFieldEnd()
+    if self.sponsoredGroupRole != None:
+      oprot.writeFieldBegin('sponsoredGroupRole', TType.I32, 10)
+      oprot.writeI32(self.sponsoredGroupRole)
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
     oprot.writeStructEnd()

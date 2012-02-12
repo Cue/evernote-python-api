@@ -26,6 +26,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
   print '  AuthenticationResult refreshAuthentication(string authenticationToken)'
   print '  User getUser(string authenticationToken)'
   print '  PublicUserInfo getPublicUserInfo(string username)'
+  print '  PremiumInfo getPremiumInfo(string authenticationToken)'
   print ''
   sys.exit(0)
 
@@ -103,5 +104,11 @@ elif cmd == 'getPublicUserInfo':
     print 'getPublicUserInfo requires 1 args'
     sys.exit(1)
   pp.pprint(client.getPublicUserInfo(args[0],))
+
+elif cmd == 'getPremiumInfo':
+  if len(args) != 1:
+    print 'getPremiumInfo requires 1 args'
+    sys.exit(1)
+  pp.pprint(client.getPremiumInfo(args[0],))
 
 transport.close()

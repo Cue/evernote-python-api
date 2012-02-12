@@ -561,6 +561,300 @@ class SyncChunk(object):
   def __ne__(self, other):
     return not (self == other)
 
+class SyncChunkFilter(object):
+  """
+   This structure is used with the 'getFilteredSyncChunk' call to provide
+   fine-grained control over the data that's returned when a client needs
+   to synchronize with the service. Each flag in this structure specifies
+   whether to include one class of data in the results of that call.
+  
+  <dl>
+   <dt>includeNotes</dt>
+     <dd>
+     If true, then the server will include the SyncChunks.notes field
+     </dd>
+  
+   <dt>includeNoteResources</dt>
+     <dd>
+     If true, then the server will include the 'resources' field on all of
+     the Notes that are in SyncChunk.notes.
+     If 'includeNotes' is false, then this will have no effect.
+     </dd>
+  
+   <dt>includeNoteAttributes</dt>
+     <dd>
+     If true, then the server will include the 'attributes' field on all of
+     the Notes that are in SyncChunks.notes.
+     If 'includeNotes' is false, then this will have no effect.
+     </dd>
+  
+   <dt>includeNotebooks</dt>
+     <dd>
+     If true, then the server will include the SyncChunks.notebooks field
+     </dd>
+  
+   <dt>includeTags</dt>
+     <dd>
+     If true, then the server will include the SyncChunks.tags field
+     </dd>
+  
+   <dt>includeSearches</dt>
+     <dd>
+     If true, then the server will include the SyncChunks.searches field
+     </dd>
+  
+   <dt>includeResources</dt>
+     <dd>
+     If true, then the server will include the SyncChunks.resources field.
+     Since the Resources are also provided with their Note
+     (in the Notes.resources list), this is primarily useful for clients that
+     want to watch for changes to individual Resources due to recognition data
+     being added.
+     </dd>
+  
+   <dt>includeLinkedNotebooks</dt>
+     <dd>
+     If true, then the server will include the SyncChunks.linkedNotebooks field.
+     </dd>
+  
+   <dt>includeExpunged</dt>
+     <dd>
+     If true, then the server will include the 'expunged' data for any type
+     of included data.  For example, if 'includeTags' and 'includeExpunged'
+     are both true, then the SyncChunks.expungedTags field will be set with
+     the GUIDs of tags that have been expunged from the server.
+     </dd>
+  
+   <dt>includeNoteApplicationDataFullMap</dt>
+     <dd>
+     If true, then the values for the applicationData map will be filled
+     in, assuming notes and note attributes are being returned.  Otherwise,
+     only the keysOnly field will be filled in.
+     </dd>
+  
+   <dt>includeResourceApplicationDataFullMap</dt>
+     <dd>
+     If true, then the fullMap values for the applicationData map will be
+     filled in, assuming resources and resource attributes are being returned
+     (includeResources is true).  Otherwise, only the keysOnly field will be
+     filled in.
+     </dd>
+  
+   <dt>includeNoteResourceApplicationDataFullMap</dt>
+     <dd>
+     If true, then the fullMap values for the applicationData map will be
+     filled in for resources found inside of notes, assuming resources are
+     being returned in notes (includeNoteResources is true).  Otherwise,
+     only the keysOnly field will be filled in.
+     </dd>
+     
+   <dt>requireNoteContentClass</dt>
+     <dd>
+     If set, then only send notes whose content class matches this value.
+     The value can be a literal match or, if the last character is an
+     asterisk, a prefix match.
+     </dd>
+      
+   </dl>
+  
+  Attributes:
+   - includeNotes
+   - includeNoteResources
+   - includeNoteAttributes
+   - includeNotebooks
+   - includeTags
+   - includeSearches
+   - includeResources
+   - includeLinkedNotebooks
+   - includeExpunged
+   - includeNoteApplicationDataFullMap
+   - includeResourceApplicationDataFullMap
+   - includeNoteResourceApplicationDataFullMap
+   - requireNoteContentClass
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.BOOL, 'includeNotes', None, None, ), # 1
+    (2, TType.BOOL, 'includeNoteResources', None, None, ), # 2
+    (3, TType.BOOL, 'includeNoteAttributes', None, None, ), # 3
+    (4, TType.BOOL, 'includeNotebooks', None, None, ), # 4
+    (5, TType.BOOL, 'includeTags', None, None, ), # 5
+    (6, TType.BOOL, 'includeSearches', None, None, ), # 6
+    (7, TType.BOOL, 'includeResources', None, None, ), # 7
+    (8, TType.BOOL, 'includeLinkedNotebooks', None, None, ), # 8
+    (9, TType.BOOL, 'includeExpunged', None, None, ), # 9
+    (10, TType.BOOL, 'includeNoteApplicationDataFullMap', None, None, ), # 10
+    (11, TType.STRING, 'requireNoteContentClass', None, None, ), # 11
+    (12, TType.BOOL, 'includeResourceApplicationDataFullMap', None, None, ), # 12
+    (13, TType.BOOL, 'includeNoteResourceApplicationDataFullMap', None, None, ), # 13
+  )
+
+  def __init__(self, includeNotes=None, includeNoteResources=None, includeNoteAttributes=None, includeNotebooks=None, includeTags=None, includeSearches=None, includeResources=None, includeLinkedNotebooks=None, includeExpunged=None, includeNoteApplicationDataFullMap=None, includeResourceApplicationDataFullMap=None, includeNoteResourceApplicationDataFullMap=None, requireNoteContentClass=None,):
+    self.includeNotes = includeNotes
+    self.includeNoteResources = includeNoteResources
+    self.includeNoteAttributes = includeNoteAttributes
+    self.includeNotebooks = includeNotebooks
+    self.includeTags = includeTags
+    self.includeSearches = includeSearches
+    self.includeResources = includeResources
+    self.includeLinkedNotebooks = includeLinkedNotebooks
+    self.includeExpunged = includeExpunged
+    self.includeNoteApplicationDataFullMap = includeNoteApplicationDataFullMap
+    self.includeResourceApplicationDataFullMap = includeResourceApplicationDataFullMap
+    self.includeNoteResourceApplicationDataFullMap = includeNoteResourceApplicationDataFullMap
+    self.requireNoteContentClass = requireNoteContentClass
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.BOOL:
+          self.includeNotes = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.BOOL:
+          self.includeNoteResources = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.BOOL:
+          self.includeNoteAttributes = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.BOOL:
+          self.includeNotebooks = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.BOOL:
+          self.includeTags = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 6:
+        if ftype == TType.BOOL:
+          self.includeSearches = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 7:
+        if ftype == TType.BOOL:
+          self.includeResources = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 8:
+        if ftype == TType.BOOL:
+          self.includeLinkedNotebooks = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 9:
+        if ftype == TType.BOOL:
+          self.includeExpunged = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 10:
+        if ftype == TType.BOOL:
+          self.includeNoteApplicationDataFullMap = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 12:
+        if ftype == TType.BOOL:
+          self.includeResourceApplicationDataFullMap = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 13:
+        if ftype == TType.BOOL:
+          self.includeNoteResourceApplicationDataFullMap = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 11:
+        if ftype == TType.STRING:
+          self.requireNoteContentClass = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('SyncChunkFilter')
+    if self.includeNotes != None:
+      oprot.writeFieldBegin('includeNotes', TType.BOOL, 1)
+      oprot.writeBool(self.includeNotes)
+      oprot.writeFieldEnd()
+    if self.includeNoteResources != None:
+      oprot.writeFieldBegin('includeNoteResources', TType.BOOL, 2)
+      oprot.writeBool(self.includeNoteResources)
+      oprot.writeFieldEnd()
+    if self.includeNoteAttributes != None:
+      oprot.writeFieldBegin('includeNoteAttributes', TType.BOOL, 3)
+      oprot.writeBool(self.includeNoteAttributes)
+      oprot.writeFieldEnd()
+    if self.includeNotebooks != None:
+      oprot.writeFieldBegin('includeNotebooks', TType.BOOL, 4)
+      oprot.writeBool(self.includeNotebooks)
+      oprot.writeFieldEnd()
+    if self.includeTags != None:
+      oprot.writeFieldBegin('includeTags', TType.BOOL, 5)
+      oprot.writeBool(self.includeTags)
+      oprot.writeFieldEnd()
+    if self.includeSearches != None:
+      oprot.writeFieldBegin('includeSearches', TType.BOOL, 6)
+      oprot.writeBool(self.includeSearches)
+      oprot.writeFieldEnd()
+    if self.includeResources != None:
+      oprot.writeFieldBegin('includeResources', TType.BOOL, 7)
+      oprot.writeBool(self.includeResources)
+      oprot.writeFieldEnd()
+    if self.includeLinkedNotebooks != None:
+      oprot.writeFieldBegin('includeLinkedNotebooks', TType.BOOL, 8)
+      oprot.writeBool(self.includeLinkedNotebooks)
+      oprot.writeFieldEnd()
+    if self.includeExpunged != None:
+      oprot.writeFieldBegin('includeExpunged', TType.BOOL, 9)
+      oprot.writeBool(self.includeExpunged)
+      oprot.writeFieldEnd()
+    if self.includeNoteApplicationDataFullMap != None:
+      oprot.writeFieldBegin('includeNoteApplicationDataFullMap', TType.BOOL, 10)
+      oprot.writeBool(self.includeNoteApplicationDataFullMap)
+      oprot.writeFieldEnd()
+    if self.requireNoteContentClass != None:
+      oprot.writeFieldBegin('requireNoteContentClass', TType.STRING, 11)
+      oprot.writeString(self.requireNoteContentClass)
+      oprot.writeFieldEnd()
+    if self.includeResourceApplicationDataFullMap != None:
+      oprot.writeFieldBegin('includeResourceApplicationDataFullMap', TType.BOOL, 12)
+      oprot.writeBool(self.includeResourceApplicationDataFullMap)
+      oprot.writeFieldEnd()
+    if self.includeNoteResourceApplicationDataFullMap != None:
+      oprot.writeFieldBegin('includeNoteResourceApplicationDataFullMap', TType.BOOL, 13)
+      oprot.writeBool(self.includeNoteResourceApplicationDataFullMap)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
 class NoteFilter(object):
   """
    A list of criteria that are used to indicate which notes are desired from
@@ -582,7 +876,8 @@ class NoteFilter(object):
   
    <dt>words</dt>
      <dd>
-     The string query containing keywords to match, if present.
+     If present, a search query string that will filter the set of notes to be returned.
+     Accepts the full search grammar documented in the Evernote API Overview.
      </dd>
   
    <dt>notebookGuid</dt>
@@ -940,6 +1235,604 @@ class NoteList(object):
   def __ne__(self, other):
     return not (self == other)
 
+class NoteMetadata(object):
+  """
+  This structure is used in the set of results returned by the
+  findNotesMetadata function.  It represents the high-level information about
+  a single Note, without some of the larger deep structure.  This allows
+  for the information about a list of Notes to be returned relatively quickly
+  with less marshalling and data transfer to remote clients.
+  Most fields in this structure are identical to the corresponding field in
+  the Note structure, with the exception of:
+  
+  <dl>
+  <dt>largestResourceMime</dt>
+    <dd>If set, then this will contain the MIME type of the largest Resource
+    (in bytes) within the Note.  This may be useful, for example, to choose
+    an appropriate icon or thumbnail to represent the Note.
+    </dd>
+  
+  <dt>largestResourceSize</dt>
+   <dd>If set, this will contain the size of the largest Resource file, in
+   bytes, within the Note.  This may be useful, for example, to decide whether
+   to ask the server for a thumbnail to represent the Note.
+   </dd>
+  </dl>
+  
+  Attributes:
+   - guid
+   - title
+   - contentLength
+   - created
+   - updated
+   - updateSequenceNum
+   - notebookGuid
+   - tagGuids
+   - attributes
+   - largestResourceMime
+   - largestResourceSize
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'guid', None, None, ), # 1
+    (2, TType.STRING, 'title', None, None, ), # 2
+    None, # 3
+    None, # 4
+    (5, TType.I32, 'contentLength', None, None, ), # 5
+    (6, TType.I64, 'created', None, None, ), # 6
+    (7, TType.I64, 'updated', None, None, ), # 7
+    None, # 8
+    None, # 9
+    (10, TType.I32, 'updateSequenceNum', None, None, ), # 10
+    (11, TType.STRING, 'notebookGuid', None, None, ), # 11
+    (12, TType.LIST, 'tagGuids', (TType.STRING,None), None, ), # 12
+    None, # 13
+    (14, TType.STRUCT, 'attributes', (evernote.edam.type.ttypes.NoteAttributes, evernote.edam.type.ttypes.NoteAttributes.thrift_spec), None, ), # 14
+    None, # 15
+    None, # 16
+    None, # 17
+    None, # 18
+    None, # 19
+    (20, TType.STRING, 'largestResourceMime', None, None, ), # 20
+    (21, TType.I32, 'largestResourceSize', None, None, ), # 21
+  )
+
+  def __init__(self, guid=None, title=None, contentLength=None, created=None, updated=None, updateSequenceNum=None, notebookGuid=None, tagGuids=None, attributes=None, largestResourceMime=None, largestResourceSize=None,):
+    self.guid = guid
+    self.title = title
+    self.contentLength = contentLength
+    self.created = created
+    self.updated = updated
+    self.updateSequenceNum = updateSequenceNum
+    self.notebookGuid = notebookGuid
+    self.tagGuids = tagGuids
+    self.attributes = attributes
+    self.largestResourceMime = largestResourceMime
+    self.largestResourceSize = largestResourceSize
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.title = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.I32:
+          self.contentLength = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 6:
+        if ftype == TType.I64:
+          self.created = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      elif fid == 7:
+        if ftype == TType.I64:
+          self.updated = iprot.readI64();
+        else:
+          iprot.skip(ftype)
+      elif fid == 10:
+        if ftype == TType.I32:
+          self.updateSequenceNum = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 11:
+        if ftype == TType.STRING:
+          self.notebookGuid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 12:
+        if ftype == TType.LIST:
+          self.tagGuids = []
+          (_etype108, _size105) = iprot.readListBegin()
+          for _i109 in xrange(_size105):
+            _elem110 = iprot.readString();
+            self.tagGuids.append(_elem110)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 14:
+        if ftype == TType.STRUCT:
+          self.attributes = evernote.edam.type.ttypes.NoteAttributes()
+          self.attributes.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 20:
+        if ftype == TType.STRING:
+          self.largestResourceMime = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 21:
+        if ftype == TType.I32:
+          self.largestResourceSize = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('NoteMetadata')
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 1)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    if self.title != None:
+      oprot.writeFieldBegin('title', TType.STRING, 2)
+      oprot.writeString(self.title)
+      oprot.writeFieldEnd()
+    if self.contentLength != None:
+      oprot.writeFieldBegin('contentLength', TType.I32, 5)
+      oprot.writeI32(self.contentLength)
+      oprot.writeFieldEnd()
+    if self.created != None:
+      oprot.writeFieldBegin('created', TType.I64, 6)
+      oprot.writeI64(self.created)
+      oprot.writeFieldEnd()
+    if self.updated != None:
+      oprot.writeFieldBegin('updated', TType.I64, 7)
+      oprot.writeI64(self.updated)
+      oprot.writeFieldEnd()
+    if self.updateSequenceNum != None:
+      oprot.writeFieldBegin('updateSequenceNum', TType.I32, 10)
+      oprot.writeI32(self.updateSequenceNum)
+      oprot.writeFieldEnd()
+    if self.notebookGuid != None:
+      oprot.writeFieldBegin('notebookGuid', TType.STRING, 11)
+      oprot.writeString(self.notebookGuid)
+      oprot.writeFieldEnd()
+    if self.tagGuids != None:
+      oprot.writeFieldBegin('tagGuids', TType.LIST, 12)
+      oprot.writeListBegin(TType.STRING, len(self.tagGuids))
+      for iter111 in self.tagGuids:
+        oprot.writeString(iter111)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.attributes != None:
+      oprot.writeFieldBegin('attributes', TType.STRUCT, 14)
+      self.attributes.write(oprot)
+      oprot.writeFieldEnd()
+    if self.largestResourceMime != None:
+      oprot.writeFieldBegin('largestResourceMime', TType.STRING, 20)
+      oprot.writeString(self.largestResourceMime)
+      oprot.writeFieldEnd()
+    if self.largestResourceSize != None:
+      oprot.writeFieldBegin('largestResourceSize', TType.I32, 21)
+      oprot.writeI32(self.largestResourceSize)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class NotesMetadataList(object):
+  """
+   This structure is returned from calls to the findNotesMetadata function to
+   give the high-level metadata about a subset of Notes that are found to
+   match a specified NoteFilter in a search.
+   
+  <dl>
+   <dt>startIndex</dt>
+     <dd>
+     The starting index within the overall set of notes.  This
+     is also the number of notes that are "before" this list in the set.
+     </dd>
+  
+   <dt>totalNotes</dt>
+     <dd>
+     The number of notes in the larger set.  This can be used
+     to calculate how many notes are "after" this note in the set.
+     (I.e.  remaining = totalNotes - (startIndex + notes.length)  )
+     </dd>
+  
+   <dt>notes</dt>
+     <dd>
+     The list of metadata for Notes in this range.  The set of optional fields
+     that are set in each metadata structure will depend on the
+     NotesMetadataResultSpec provided by the caller when the search was
+     performed.  Only the 'guid' field will be guaranteed to be set in each
+     Note.
+     </dd>
+  
+   <dt>stoppedWords</dt>
+     <dd>
+     If the NoteList was produced using a text based search
+     query that included words that are not indexed or searched by the service,
+     this will include a list of those ignored words.
+     </dd>
+  
+   <dt>searchedWords</dt>
+     <dd>
+     If the NoteList was produced using a text based search
+     query that included viable search words or quoted expressions, this will
+     include a list of those words.  Any stopped words will not be included
+     in this list.
+     </dd>
+  
+   <dt>updateCount</dt>
+     <dd>
+     Indicates the total number of transactions that have
+     been committed within the account.  This reflects (for example) the
+     number of discrete additions or modifications that have been made to
+     the data in this account (tags, notes, resources, etc.).
+     This number is the "high water mark" for Update Sequence Numbers (USN)
+     within the account.
+     </dd>
+   </dl>
+  
+  Attributes:
+   - startIndex
+   - totalNotes
+   - notes
+   - stoppedWords
+   - searchedWords
+   - updateCount
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.I32, 'startIndex', None, None, ), # 1
+    (2, TType.I32, 'totalNotes', None, None, ), # 2
+    (3, TType.LIST, 'notes', (TType.STRUCT,(NoteMetadata, NoteMetadata.thrift_spec)), None, ), # 3
+    (4, TType.LIST, 'stoppedWords', (TType.STRING,None), None, ), # 4
+    (5, TType.LIST, 'searchedWords', (TType.STRING,None), None, ), # 5
+    (6, TType.I32, 'updateCount', None, None, ), # 6
+  )
+
+  def __init__(self, startIndex=None, totalNotes=None, notes=None, stoppedWords=None, searchedWords=None, updateCount=None,):
+    self.startIndex = startIndex
+    self.totalNotes = totalNotes
+    self.notes = notes
+    self.stoppedWords = stoppedWords
+    self.searchedWords = searchedWords
+    self.updateCount = updateCount
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.I32:
+          self.startIndex = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.I32:
+          self.totalNotes = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.LIST:
+          self.notes = []
+          (_etype115, _size112) = iprot.readListBegin()
+          for _i116 in xrange(_size112):
+            _elem117 = NoteMetadata()
+            _elem117.read(iprot)
+            self.notes.append(_elem117)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.LIST:
+          self.stoppedWords = []
+          (_etype121, _size118) = iprot.readListBegin()
+          for _i122 in xrange(_size118):
+            _elem123 = iprot.readString();
+            self.stoppedWords.append(_elem123)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.LIST:
+          self.searchedWords = []
+          (_etype127, _size124) = iprot.readListBegin()
+          for _i128 in xrange(_size124):
+            _elem129 = iprot.readString();
+            self.searchedWords.append(_elem129)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      elif fid == 6:
+        if ftype == TType.I32:
+          self.updateCount = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('NotesMetadataList')
+    if self.startIndex != None:
+      oprot.writeFieldBegin('startIndex', TType.I32, 1)
+      oprot.writeI32(self.startIndex)
+      oprot.writeFieldEnd()
+    if self.totalNotes != None:
+      oprot.writeFieldBegin('totalNotes', TType.I32, 2)
+      oprot.writeI32(self.totalNotes)
+      oprot.writeFieldEnd()
+    if self.notes != None:
+      oprot.writeFieldBegin('notes', TType.LIST, 3)
+      oprot.writeListBegin(TType.STRUCT, len(self.notes))
+      for iter130 in self.notes:
+        iter130.write(oprot)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.stoppedWords != None:
+      oprot.writeFieldBegin('stoppedWords', TType.LIST, 4)
+      oprot.writeListBegin(TType.STRING, len(self.stoppedWords))
+      for iter131 in self.stoppedWords:
+        oprot.writeString(iter131)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.searchedWords != None:
+      oprot.writeFieldBegin('searchedWords', TType.LIST, 5)
+      oprot.writeListBegin(TType.STRING, len(self.searchedWords))
+      for iter132 in self.searchedWords:
+        oprot.writeString(iter132)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    if self.updateCount != None:
+      oprot.writeFieldBegin('updateCount', TType.I32, 6)
+      oprot.writeI32(self.updateCount)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class NotesMetadataResultSpec(object):
+  """
+  This structure is provided to the findNotesMetadata function to specify
+  the subset of fields that should be included in each NoteMetadata element
+  that is returned in the NotesMetadataList.
+  Each field on this structure is a boolean flag that indicates whether the
+  corresponding field should be included in the NoteMetadata structure when
+  it is returned.  For example, if the 'includeTitle' field is set on this
+  structure when calling findNotesMetadata, then each NoteMetadata in the
+  list should have its 'title' field set.
+  If one of the fields in this spec is not set, then it will be treated as
+  'false' by the server, so the default behavior is to include nothing in
+  replies (but the mandatory GUID)
+  
+  Attributes:
+   - includeTitle
+   - includeContentLength
+   - includeCreated
+   - includeUpdated
+   - includeUpdateSequenceNum
+   - includeNotebookGuid
+   - includeTagGuids
+   - includeAttributes
+   - includeLargestResourceMime
+   - includeLargestResourceSize
+  """
+
+  thrift_spec = (
+    None, # 0
+    None, # 1
+    (2, TType.BOOL, 'includeTitle', None, None, ), # 2
+    None, # 3
+    None, # 4
+    (5, TType.BOOL, 'includeContentLength', None, None, ), # 5
+    (6, TType.BOOL, 'includeCreated', None, None, ), # 6
+    (7, TType.BOOL, 'includeUpdated', None, None, ), # 7
+    None, # 8
+    None, # 9
+    (10, TType.BOOL, 'includeUpdateSequenceNum', None, None, ), # 10
+    (11, TType.BOOL, 'includeNotebookGuid', None, None, ), # 11
+    (12, TType.BOOL, 'includeTagGuids', None, None, ), # 12
+    None, # 13
+    (14, TType.BOOL, 'includeAttributes', None, None, ), # 14
+    None, # 15
+    None, # 16
+    None, # 17
+    None, # 18
+    None, # 19
+    (20, TType.BOOL, 'includeLargestResourceMime', None, None, ), # 20
+    (21, TType.BOOL, 'includeLargestResourceSize', None, None, ), # 21
+  )
+
+  def __init__(self, includeTitle=None, includeContentLength=None, includeCreated=None, includeUpdated=None, includeUpdateSequenceNum=None, includeNotebookGuid=None, includeTagGuids=None, includeAttributes=None, includeLargestResourceMime=None, includeLargestResourceSize=None,):
+    self.includeTitle = includeTitle
+    self.includeContentLength = includeContentLength
+    self.includeCreated = includeCreated
+    self.includeUpdated = includeUpdated
+    self.includeUpdateSequenceNum = includeUpdateSequenceNum
+    self.includeNotebookGuid = includeNotebookGuid
+    self.includeTagGuids = includeTagGuids
+    self.includeAttributes = includeAttributes
+    self.includeLargestResourceMime = includeLargestResourceMime
+    self.includeLargestResourceSize = includeLargestResourceSize
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 2:
+        if ftype == TType.BOOL:
+          self.includeTitle = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.BOOL:
+          self.includeContentLength = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 6:
+        if ftype == TType.BOOL:
+          self.includeCreated = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 7:
+        if ftype == TType.BOOL:
+          self.includeUpdated = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 10:
+        if ftype == TType.BOOL:
+          self.includeUpdateSequenceNum = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 11:
+        if ftype == TType.BOOL:
+          self.includeNotebookGuid = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 12:
+        if ftype == TType.BOOL:
+          self.includeTagGuids = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 14:
+        if ftype == TType.BOOL:
+          self.includeAttributes = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 20:
+        if ftype == TType.BOOL:
+          self.includeLargestResourceMime = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      elif fid == 21:
+        if ftype == TType.BOOL:
+          self.includeLargestResourceSize = iprot.readBool();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('NotesMetadataResultSpec')
+    if self.includeTitle != None:
+      oprot.writeFieldBegin('includeTitle', TType.BOOL, 2)
+      oprot.writeBool(self.includeTitle)
+      oprot.writeFieldEnd()
+    if self.includeContentLength != None:
+      oprot.writeFieldBegin('includeContentLength', TType.BOOL, 5)
+      oprot.writeBool(self.includeContentLength)
+      oprot.writeFieldEnd()
+    if self.includeCreated != None:
+      oprot.writeFieldBegin('includeCreated', TType.BOOL, 6)
+      oprot.writeBool(self.includeCreated)
+      oprot.writeFieldEnd()
+    if self.includeUpdated != None:
+      oprot.writeFieldBegin('includeUpdated', TType.BOOL, 7)
+      oprot.writeBool(self.includeUpdated)
+      oprot.writeFieldEnd()
+    if self.includeUpdateSequenceNum != None:
+      oprot.writeFieldBegin('includeUpdateSequenceNum', TType.BOOL, 10)
+      oprot.writeBool(self.includeUpdateSequenceNum)
+      oprot.writeFieldEnd()
+    if self.includeNotebookGuid != None:
+      oprot.writeFieldBegin('includeNotebookGuid', TType.BOOL, 11)
+      oprot.writeBool(self.includeNotebookGuid)
+      oprot.writeFieldEnd()
+    if self.includeTagGuids != None:
+      oprot.writeFieldBegin('includeTagGuids', TType.BOOL, 12)
+      oprot.writeBool(self.includeTagGuids)
+      oprot.writeFieldEnd()
+    if self.includeAttributes != None:
+      oprot.writeFieldBegin('includeAttributes', TType.BOOL, 14)
+      oprot.writeBool(self.includeAttributes)
+      oprot.writeFieldEnd()
+    if self.includeLargestResourceMime != None:
+      oprot.writeFieldBegin('includeLargestResourceMime', TType.BOOL, 20)
+      oprot.writeBool(self.includeLargestResourceMime)
+      oprot.writeFieldEnd()
+    if self.includeLargestResourceSize != None:
+      oprot.writeFieldBegin('includeLargestResourceSize', TType.BOOL, 21)
+      oprot.writeBool(self.includeLargestResourceSize)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
 class NoteCollectionCounts(object):
   """
    A data structure representing the number of notes for each notebook
@@ -997,22 +1890,22 @@ class NoteCollectionCounts(object):
       if fid == 1:
         if ftype == TType.MAP:
           self.notebookCounts = {}
-          (_ktype106, _vtype107, _size105 ) = iprot.readMapBegin() 
-          for _i109 in xrange(_size105):
-            _key110 = iprot.readString();
-            _val111 = iprot.readI32();
-            self.notebookCounts[_key110] = _val111
+          (_ktype134, _vtype135, _size133 ) = iprot.readMapBegin() 
+          for _i137 in xrange(_size133):
+            _key138 = iprot.readString();
+            _val139 = iprot.readI32();
+            self.notebookCounts[_key138] = _val139
           iprot.readMapEnd()
         else:
           iprot.skip(ftype)
       elif fid == 2:
         if ftype == TType.MAP:
           self.tagCounts = {}
-          (_ktype113, _vtype114, _size112 ) = iprot.readMapBegin() 
-          for _i116 in xrange(_size112):
-            _key117 = iprot.readString();
-            _val118 = iprot.readI32();
-            self.tagCounts[_key117] = _val118
+          (_ktype141, _vtype142, _size140 ) = iprot.readMapBegin() 
+          for _i144 in xrange(_size140):
+            _key145 = iprot.readString();
+            _val146 = iprot.readI32();
+            self.tagCounts[_key145] = _val146
           iprot.readMapEnd()
         else:
           iprot.skip(ftype)
@@ -1034,17 +1927,17 @@ class NoteCollectionCounts(object):
     if self.notebookCounts != None:
       oprot.writeFieldBegin('notebookCounts', TType.MAP, 1)
       oprot.writeMapBegin(TType.STRING, TType.I32, len(self.notebookCounts))
-      for kiter119,viter120 in self.notebookCounts.items():
-        oprot.writeString(kiter119)
-        oprot.writeI32(viter120)
+      for kiter147,viter148 in self.notebookCounts.items():
+        oprot.writeString(kiter147)
+        oprot.writeI32(viter148)
       oprot.writeMapEnd()
       oprot.writeFieldEnd()
     if self.tagCounts != None:
       oprot.writeFieldBegin('tagCounts', TType.MAP, 2)
       oprot.writeMapBegin(TType.STRING, TType.I32, len(self.tagCounts))
-      for kiter121,viter122 in self.tagCounts.items():
-        oprot.writeString(kiter121)
-        oprot.writeI32(viter122)
+      for kiter149,viter150 in self.tagCounts.items():
+        oprot.writeString(kiter149)
+        oprot.writeI32(viter150)
       oprot.writeMapEnd()
       oprot.writeFieldEnd()
     if self.trashCount != None:
@@ -1243,11 +2136,11 @@ class AdParameters(object):
       elif fid == 4:
         if ftype == TType.LIST:
           self.impressions = []
-          (_etype126, _size123) = iprot.readListBegin()
-          for _i127 in xrange(_size123):
-            _elem128 = AdImpressions()
-            _elem128.read(iprot)
-            self.impressions.append(_elem128)
+          (_etype154, _size151) = iprot.readListBegin()
+          for _i155 in xrange(_size151):
+            _elem156 = AdImpressions()
+            _elem156.read(iprot)
+            self.impressions.append(_elem156)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -1259,11 +2152,11 @@ class AdParameters(object):
       elif fid == 6:
         if ftype == TType.MAP:
           self.clientProperties = {}
-          (_ktype130, _vtype131, _size129 ) = iprot.readMapBegin() 
-          for _i133 in xrange(_size129):
-            _key134 = iprot.readString();
-            _val135 = iprot.readString();
-            self.clientProperties[_key134] = _val135
+          (_ktype158, _vtype159, _size157 ) = iprot.readMapBegin() 
+          for _i161 in xrange(_size157):
+            _key162 = iprot.readString();
+            _val163 = iprot.readString();
+            self.clientProperties[_key162] = _val163
           iprot.readMapEnd()
         else:
           iprot.skip(ftype)
@@ -1284,8 +2177,8 @@ class AdParameters(object):
     if self.impressions != None:
       oprot.writeFieldBegin('impressions', TType.LIST, 4)
       oprot.writeListBegin(TType.STRUCT, len(self.impressions))
-      for iter136 in self.impressions:
-        iter136.write(oprot)
+      for iter164 in self.impressions:
+        iter164.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.supportHtml != None:
@@ -1295,9 +2188,9 @@ class AdParameters(object):
     if self.clientProperties != None:
       oprot.writeFieldBegin('clientProperties', TType.MAP, 6)
       oprot.writeMapBegin(TType.STRING, TType.STRING, len(self.clientProperties))
-      for kiter137,viter138 in self.clientProperties.items():
-        oprot.writeString(kiter137)
-        oprot.writeString(viter138)
+      for kiter165,viter166 in self.clientProperties.items():
+        oprot.writeString(kiter165)
+        oprot.writeString(viter166)
       oprot.writeMapEnd()
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
@@ -1413,20 +2306,20 @@ class NoteEmailParameters(object):
       elif fid == 3:
         if ftype == TType.LIST:
           self.toAddresses = []
-          (_etype142, _size139) = iprot.readListBegin()
-          for _i143 in xrange(_size139):
-            _elem144 = iprot.readString();
-            self.toAddresses.append(_elem144)
+          (_etype170, _size167) = iprot.readListBegin()
+          for _i171 in xrange(_size167):
+            _elem172 = iprot.readString();
+            self.toAddresses.append(_elem172)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
       elif fid == 4:
         if ftype == TType.LIST:
           self.ccAddresses = []
-          (_etype148, _size145) = iprot.readListBegin()
-          for _i149 in xrange(_size145):
-            _elem150 = iprot.readString();
-            self.ccAddresses.append(_elem150)
+          (_etype176, _size173) = iprot.readListBegin()
+          for _i177 in xrange(_size173):
+            _elem178 = iprot.readString();
+            self.ccAddresses.append(_elem178)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -1461,15 +2354,15 @@ class NoteEmailParameters(object):
     if self.toAddresses != None:
       oprot.writeFieldBegin('toAddresses', TType.LIST, 3)
       oprot.writeListBegin(TType.STRING, len(self.toAddresses))
-      for iter151 in self.toAddresses:
-        oprot.writeString(iter151)
+      for iter179 in self.toAddresses:
+        oprot.writeString(iter179)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.ccAddresses != None:
       oprot.writeFieldBegin('ccAddresses', TType.LIST, 4)
       oprot.writeListBegin(TType.STRING, len(self.ccAddresses))
-      for iter152 in self.ccAddresses:
-        oprot.writeString(iter152)
+      for iter180 in self.ccAddresses:
+        oprot.writeString(iter180)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.subject != None:
@@ -1496,7 +2389,7 @@ class NoteEmailParameters(object):
 
 class NoteVersionId(object):
   """
-  Identfying information about previous versions of a note that are backed up
+  Identifying information about previous versions of a note that are backed up
   within Evernote's servers.  Used in the return value of the listNoteVersions
   call.
   
@@ -1522,7 +2415,7 @@ class NoteVersionId(object):
    </dd>
    <dt>title</dt>
    <dd>
-     The title of the note when this particular verison was saved.  (The
+     The title of the note when this particular version was saved.  (The
      current title of the note may differ from this value.)
    </dd>
   </dl>

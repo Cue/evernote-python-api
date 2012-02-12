@@ -68,8 +68,12 @@ class Iface(object):
     
     @param maxEntries
       The maximum number of modified objects that should be
-      returned in the result SyncChunk.  This can be used to limit the size
+      returned in the result SyncChunk. This can be used to limit the size
       of each individual message to be friendly for network transfer.
+      Applications should not request more than 256 objects at a time,
+      and must handle the case where the service returns less than the
+      requested number of objects in a given request even though more
+      objects are available on the service.
     
     @param fullSyncOnly
       If true, then the client only wants initial data for a full sync.
@@ -89,6 +93,48 @@ class Iface(object):
      - afterUSN
      - maxEntries
      - fullSyncOnly
+    """
+    pass
+
+  def getFilteredSyncChunk(self, authenticationToken, afterUSN, maxEntries, filter):
+    """
+    Asks the NoteStore to provide the state of the account in order of
+    last modification.  This request retrieves one block of the server's
+    state so that a client can make several small requests against a large
+    account rather than getting the entire state in one big message.
+    This call gives more fine-grained control of the data that will
+    be received by a client by omitting data elements that a client doesn't
+    need. This may reduce network traffic and sync times.
+    
+    @param afterUSN
+      The client can pass this value to ask only for objects that
+      have been updated after a certain point.  This allows the client to
+      receive updates after its last checkpoint rather than doing a full
+      synchronization on every pass.  The default value of "0" indicates
+      that the client wants to get objects from the start of the account.
+    
+    @param maxEntries
+      The maximum number of modified objects that should be
+      returned in the result SyncChunk.  This can be used to limit the size
+      of each individual message to be friendly for network transfer.
+    
+    @param filter
+      The caller must set some of the flags in this structure to specify which
+      data types should be returned during the synchronization.  See
+      the SyncChunkFilter structure for information on each flag.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "afterUSN" - if negative
+      </li>
+      <li> BAD_DATA_FORMAT "maxEntries" - if less than 1
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - afterUSN
+     - maxEntries
+     - filter
     """
     pass
 
@@ -155,6 +201,10 @@ class Iface(object):
       The maximum number of modified objects that should be
       returned in the result SyncChunk.  This can be used to limit the size
       of each individual message to be friendly for network transfer.
+      Applications should not request more than 256 objects at a time,
+      and must handle the case where the service returns less than the
+      requested number of objects in a given request even though more
+      objects are available on the service.
     
     @param fullSyncOnly
       If true, then the client only wants initial data for a full sync.
@@ -678,9 +728,10 @@ class Iface(object):
       pagination.
     
     @param maxNotes
-      The most notes to return in this query.  The service will
-      either return this many notes or the end of the notebook, whichever is
-      shorter.
+      The most notes to return in this query.  The service will return a set
+      of notes that is no larger than this number, but may return fewer notes
+      if needed.  The NoteList.totalNotes field in the return value will
+      indicate whether there are more values available after the returned set.
     
     @return
       The list of notes that match the criteria.
@@ -707,6 +758,117 @@ class Iface(object):
      - filter
      - offset
      - maxNotes
+    """
+    pass
+
+  def findNoteOffset(self, authenticationToken, filter, guid):
+    """
+    Finds the position of a note within a sorted subset of all of the user's
+    notes. This may be useful for thin clients that are displaying a paginated
+    listing of a large account, which need to know where a particular note
+    sits in the list without retrieving all notes first.
+    
+    @param authenticationToken
+      Must be a valid token for the user's account unless the NoteFilter
+      'notebookGuid' is the GUID of a public notebook.
+    
+    @param filter
+      The list of criteria that will constrain the notes to be returned.
+    
+    @param guid
+      The GUID of the note to be retrieved.
+    
+    @return
+      If the note with the provided GUID is found within the matching note
+      list, this will return the offset of that note within that list (where
+      the first offset is 0).  If the note is not found within the set of
+      notes, this will return -1.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "offset" - not between 0 and EDAM_USER_NOTES_MAX
+      </li>
+      <li> BAD_DATA_FORMAT "maxNotes" - not between 0 and EDAM_USER_NOTES_MAX
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.notebookGuid" - if malformed
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.tagGuids" - if any are malformed
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.words" - if search string too long
+      </li>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Notebook.guid" - not found, by GUID
+      </li>
+      <li> "Note.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - filter
+     - guid
+    """
+    pass
+
+  def findNotesMetadata(self, authenticationToken, filter, offset, maxNotes, resultSpec):
+    """
+    Used to find the high-level information about a set of the notes from a
+    user's account based on various criteria specified via a NoteFilter object.
+    This should be used instead of 'findNotes' whenever the client doesn't
+    really need all of the deep structure of every Note and Resource, but
+    just wants a high-level list of information.  This will save time and
+    bandwidth.
+    
+    @param authenticationToken
+      Must be a valid token for the user's account unless the NoteFilter
+      'notebookGuid' is the GUID of a public notebook.
+    
+    @param filter
+      The list of criteria that will constrain the notes to be returned.
+    
+    @param offset
+      The numeric index of the first note to show within the sorted
+      results.  The numbering scheme starts with "0".  This can be used for
+      pagination.
+    
+    @param maxNotes
+      The mximum notes to return in this query.  The service will return a set
+      of notes that is no larger than this number, but may return fewer notes
+      if needed.  The NoteList.totalNotes field in the return value will
+      indicate whether there are more values available after the returned set.
+    
+    @param resultSpec
+      This specifies which information should be returned for each matching
+      Note. The fields on this structure can be used to eliminate data that
+      the client doesn't need, which will reduce the time and bandwidth
+      to receive and process the reply.
+    
+    @return
+      The list of notes that match the criteria.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "offset" - not between 0 and EDAM_USER_NOTES_MAX
+      </li>
+      <li> BAD_DATA_FORMAT "maxNotes" - not between 0 and EDAM_USER_NOTES_MAX
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.notebookGuid" - if malformed
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.tagGuids" - if any are malformed
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.words" - if search string too long
+      </li>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Notebook.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - filter
+     - offset
+     - maxNotes
+     - resultSpec
     """
     pass
 
@@ -761,7 +923,8 @@ class Iface(object):
     for each resource in the note, but the binary contents of the resources
     and their recognition data will be omitted.
     If the Note is found in a public notebook, the authenticationToken
-    will be ignored (so it could be an empty string).
+    will be ignored (so it could be an empty string).  The applicationData
+    fields are returned as keysOnly.
     
     @param guid
       The GUID of the note to be retrieved.
@@ -802,6 +965,64 @@ class Iface(object):
      - withResourcesData
      - withResourcesRecognition
      - withResourcesAlternateData
+    """
+    pass
+
+  def getNoteApplicationData(self, authenticationToken, guid):
+    """
+    Get all of the application data for the note identified by GUID,
+    with values returned within the LazyMap fullMap field.
+    If there are no applicationData entries, then a LazyMap
+    with an empty fullMap will be returned. If your application
+    only needs to fetch its own applicationData entry, use
+    getNoteApplicationDataEntry instead.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+    """
+    pass
+
+  def getNoteApplicationDataEntry(self, authenticationToken, guid, key):
+    """
+    Get the value of a single entry in the applicationData map
+    for the note identified by GUID.
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Note.guid" - note not found, by GUID</li>
+      <li> "NoteAttributes.applicationData.key" - note not found, by key</li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+    """
+    pass
+
+  def setNoteApplicationDataEntry(self, authenticationToken, guid, key, value):
+    """
+    Update, or create, an entry in the applicationData map for
+    the note identified by guid.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+     - value
+    """
+    pass
+
+  def unsetNoteApplicationDataEntry(self, authenticationToken, guid, key):
+    """
+    Remove an entry identified by 'key' from the applicationData map for
+    the note identified by 'guid'. Silently ignores an unset of a
+    non-existing key.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
     """
     pass
 
@@ -1000,11 +1221,15 @@ class Iface(object):
   def updateNote(self, authenticationToken, note):
     """
     Submit a set of changes to a note to the service.  The provided data
-    must include the note's guid field for identification.
+    must include the note's guid field for identification. The note's
+    title must also be set.
     
     @param note
       A Note object containing the desired fields to be populated on
-      the service.
+      the service. With the exception of the note's title and guid, fields
+      that are not being changed do not need to be set. If the content is not
+      being modified, note.content should be left unset. If the list of
+      resources is not being modified, note.resources should be left unset.
     
     @return
       The metadata (no contents) for the Note on the server after the update
@@ -1068,7 +1293,7 @@ class Iface(object):
   def deleteNote(self, authenticationToken, guid):
     """
     Moves the note into the trash. The note may still be undeleted, unless it
-    is expunged.  This is equivalent to calling udpateNote() after setting
+    is expunged.  This is equivalent to calling updateNote() after setting
     Note.active = false
     
     @param guid
@@ -1083,6 +1308,10 @@ class Iface(object):
       </li>
     </ul>
     
+    @throws EDAMUserException <ul>
+      <li> DATA_CONFLICT "Note.guid" - the note is already deleted
+      </li>
+    </ul>
     @throws EDAMNotFoundException <ul>
       <li> "Note.guid" - not found, by GUID
       </li>
@@ -1309,7 +1538,8 @@ class Iface(object):
     Returns the current state of the resource in the service with the
     provided GUID.
     If the Resource is found in a public notebook, the authenticationToken
-    will be ignored (so it could be an empty string).
+    will be ignored (so it could be an empty string).  Only the
+    keys for the applicationData will be returned.
     
     @param guid
       The GUID of the resource to be retrieved.
@@ -1351,6 +1581,63 @@ class Iface(object):
     """
     pass
 
+  def getResourceApplicationData(self, authenticationToken, guid):
+    """
+    Get all of the application data for the Resource identified by GUID,
+    with values returned within the LazyMap fullMap field.
+    If there are no applicationData entries, then a LazyMap
+    with an empty fullMap will be returned. If your application
+    only needs to fetch its own applicationData entry, use
+    getResourceApplicationDataEntry instead.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+    """
+    pass
+
+  def getResourceApplicationDataEntry(self, authenticationToken, guid, key):
+    """
+    Get the value of a single entry in the applicationData map
+    for the Resource identified by GUID.
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Resource.guid" - Resource not found, by GUID</li>
+      <li> "ResourceAttributes.applicationData.key" - Resource not found, by key</li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+    """
+    pass
+
+  def setResourceApplicationDataEntry(self, authenticationToken, guid, key, value):
+    """
+    Update, or create, an entry in the applicationData map for
+    the Resource identified by guid.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+     - value
+    """
+    pass
+
+  def unsetResourceApplicationDataEntry(self, authenticationToken, guid, key):
+    """
+    Remove an entry identified by 'key' from the applicationData map for
+    the Resource identified by 'guid'.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+    """
+    pass
+
   def updateResource(self, authenticationToken, resource):
     """
     Submit a set of changes to a resource to the service.  This can be used
@@ -1374,11 +1661,6 @@ class Iface(object):
          </li>
          <li>duration
          </li>
-         <li>recognition:  if this is provided, it must include the
-             data body for the resource recognition index data and the
-             recoFormat must be provided.  If absent,
-             the recognition on the server won't be changed.
-         </li>
          <li>attributes:  optional.  if present, the set of attributes will
               be replaced.
          </li>
@@ -1394,8 +1676,6 @@ class Iface(object):
       <li> BAD_DATA_FORMAT "Resource.mime" - invalid resource MIME type
       </li>
       <li> BAD_DATA_FORMAT "ResourceAttributes.*" - bad resource string
-      </li>
-      <li> DATA_REQUIRED "Resource.data" - resource data body missing
       </li>
       <li> LIMIT_REACHED "ResourceAttribute.*" - attribute string too long
       </li>
@@ -1684,6 +1964,45 @@ class Iface(object):
     """
     pass
 
+  def sendMessageToSharedNotebookMembers(self, authenticationToken, notebookGuid, messageText, recipients):
+    """
+    Send a reminder message to some or all of the email addresses that a notebook has been
+    shared with. The message includes the current link to view the notebook.
+    @param authenticationToken
+      The auth token of the user with permissions to share the notebook
+    @param notebookGuid
+      The guid of the shared notebook
+    @param messageText
+     User provided text to include in the email
+    @param recipients
+     The email addresses of the recipients. If this list is empty then all of the
+     users that the notebook has been shared with are emailed.
+     If an email address doesn't correspond to share invite members then that address
+     is ignored.
+    @return
+     The number of messages sent
+    @throws EDAMUserException <ul>
+      <li> LIMIT_REACHED "(recipients)" -
+        The email can't be sent because this would exceed the user's daily
+        email limit.
+      </li>
+      <li> PERMISSION_DENIED "Notebook" - private note, user doesn't own
+      </li>
+    </ul>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Notebook.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - notebookGuid
+     - messageText
+     - recipients
+    """
+    pass
+
   def listSharedNotebooks(self, authenticationToken):
     """
     Lists the collection of shared notebooks for all notebooks in the
@@ -1904,6 +2223,8 @@ class Iface(object):
       <li> DATA_REQUIRED "Note.content" -
         if the caller provides a Note parameter with no content
       </li>
+      <li> ENML_VALIDATION "*" - note content doesn't validate against DTD
+      </li>
       <li> DATA_REQUIRED "NoteEmailParameters.note" -
         if no guid or note provided
       </li>
@@ -1919,6 +2240,99 @@ class Iface(object):
     Parameters:
      - authenticationToken
      - parameters
+    """
+    pass
+
+  def shareNote(self, authenticationToken, guid):
+    """
+    If this note is not already shared (via its own direct URL), then this
+    will start sharing that note.
+    This will return the secret "Note Key" for this note that
+    can currently be used in conjunction with the Note's GUID to gain direct
+    read-only access to the Note.
+    If the note is already shared, then this won't make any changes to the
+    note, and the existing "Note Key" will be returned.  The only way to change
+    the Note Key for an existing note is to stopSharingNote first, and then
+    call this function.
+    
+    @param guid
+      The GUID of the note to be shared.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "Note.guid" - if the parameter is missing
+      </li>
+      <li> PERMISSION_DENIED "Note" - private note, user doesn't own
+      </li>
+    </ul>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Note.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - guid
+    """
+    pass
+
+  def stopSharingNote(self, authenticationToken, guid):
+    """
+    If this note is not already shared then this will stop sharing that note
+    and invalidate its "Note Key", so any existing URLs to access that Note
+    will stop working.
+    If the Note is not shared, then this function will do nothing.
+    
+    @param guid
+      The GUID of the note to be un-shared.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "Note.guid" - if the parameter is missing
+      </li>
+      <li> PERMISSION_DENIED "Note" - private note, user doesn't own
+      </li>
+    </ul>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Note.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - guid
+    """
+    pass
+
+  def authenticateToSharedNote(self, guid, noteKey):
+    """
+    Asks the service to produce an authentication token that can be used to
+    access the contents of a single Note which was individually shared
+    from someone's account.
+    This authenticationToken can be used with the various other NoteStore
+    calls to find and retrieve the Note and its directly-referenced children.
+    
+    @param guid
+      The GUID identifying this Note on this shard.
+    
+    @param noteKey
+      The 'noteKey' identifier from the Note that was originally created via
+      a call to shareNote() and then given to a recipient to access.
+    
+    @throws EDAMUserException <ul>
+      <li> PERMISSION_DENIED "Note" - the Note with that GUID is either not
+        shared, or the noteKey doesn't match the current key for this note
+      </li>
+    </ul>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "guid" - the note with that GUID is not found
+      </li>
+    </ul>
+    
+    Parameters:
+     - guid
+     - noteKey
     """
     pass
 
@@ -2009,8 +2423,12 @@ class Client(Iface):
     
     @param maxEntries
       The maximum number of modified objects that should be
-      returned in the result SyncChunk.  This can be used to limit the size
+      returned in the result SyncChunk. This can be used to limit the size
       of each individual message to be friendly for network transfer.
+      Applications should not request more than 256 objects at a time,
+      and must handle the case where the service returns less than the
+      requested number of objects in a given request even though more
+      objects are available on the service.
     
     @param fullSyncOnly
       If true, then the client only wants initial data for a full sync.
@@ -2062,6 +2480,78 @@ class Client(Iface):
     if result.systemException != None:
       raise result.systemException
     raise TApplicationException(TApplicationException.MISSING_RESULT, "getSyncChunk failed: unknown result");
+
+  def getFilteredSyncChunk(self, authenticationToken, afterUSN, maxEntries, filter):
+    """
+    Asks the NoteStore to provide the state of the account in order of
+    last modification.  This request retrieves one block of the server's
+    state so that a client can make several small requests against a large
+    account rather than getting the entire state in one big message.
+    This call gives more fine-grained control of the data that will
+    be received by a client by omitting data elements that a client doesn't
+    need. This may reduce network traffic and sync times.
+    
+    @param afterUSN
+      The client can pass this value to ask only for objects that
+      have been updated after a certain point.  This allows the client to
+      receive updates after its last checkpoint rather than doing a full
+      synchronization on every pass.  The default value of "0" indicates
+      that the client wants to get objects from the start of the account.
+    
+    @param maxEntries
+      The maximum number of modified objects that should be
+      returned in the result SyncChunk.  This can be used to limit the size
+      of each individual message to be friendly for network transfer.
+    
+    @param filter
+      The caller must set some of the flags in this structure to specify which
+      data types should be returned during the synchronization.  See
+      the SyncChunkFilter structure for information on each flag.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "afterUSN" - if negative
+      </li>
+      <li> BAD_DATA_FORMAT "maxEntries" - if less than 1
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - afterUSN
+     - maxEntries
+     - filter
+    """
+    self.send_getFilteredSyncChunk(authenticationToken, afterUSN, maxEntries, filter)
+    return self.recv_getFilteredSyncChunk()
+
+  def send_getFilteredSyncChunk(self, authenticationToken, afterUSN, maxEntries, filter):
+    self._oprot.writeMessageBegin('getFilteredSyncChunk', TMessageType.CALL, self._seqid)
+    args = getFilteredSyncChunk_args()
+    args.authenticationToken = authenticationToken
+    args.afterUSN = afterUSN
+    args.maxEntries = maxEntries
+    args.filter = filter
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_getFilteredSyncChunk(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = getFilteredSyncChunk_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "getFilteredSyncChunk failed: unknown result");
 
   def getLinkedNotebookSyncState(self, authenticationToken, linkedNotebook):
     """
@@ -2156,6 +2646,10 @@ class Client(Iface):
       The maximum number of modified objects that should be
       returned in the result SyncChunk.  This can be used to limit the size
       of each individual message to be friendly for network transfer.
+      Applications should not request more than 256 objects at a time,
+      and must handle the case where the service returns less than the
+      requested number of objects in a given request even though more
+      objects are available on the service.
     
     @param fullSyncOnly
       If true, then the client only wants initial data for a full sync.
@@ -3234,9 +3728,10 @@ class Client(Iface):
       pagination.
     
     @param maxNotes
-      The most notes to return in this query.  The service will
-      either return this many notes or the end of the notebook, whichever is
-      shorter.
+      The most notes to return in this query.  The service will return a set
+      of notes that is no larger than this number, but may return fewer notes
+      if needed.  The NoteList.totalNotes field in the return value will
+      indicate whether there are more values available after the returned set.
     
     @return
       The list of notes that match the criteria.
@@ -3297,6 +3792,181 @@ class Client(Iface):
     if result.notFoundException != None:
       raise result.notFoundException
     raise TApplicationException(TApplicationException.MISSING_RESULT, "findNotes failed: unknown result");
+
+  def findNoteOffset(self, authenticationToken, filter, guid):
+    """
+    Finds the position of a note within a sorted subset of all of the user's
+    notes. This may be useful for thin clients that are displaying a paginated
+    listing of a large account, which need to know where a particular note
+    sits in the list without retrieving all notes first.
+    
+    @param authenticationToken
+      Must be a valid token for the user's account unless the NoteFilter
+      'notebookGuid' is the GUID of a public notebook.
+    
+    @param filter
+      The list of criteria that will constrain the notes to be returned.
+    
+    @param guid
+      The GUID of the note to be retrieved.
+    
+    @return
+      If the note with the provided GUID is found within the matching note
+      list, this will return the offset of that note within that list (where
+      the first offset is 0).  If the note is not found within the set of
+      notes, this will return -1.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "offset" - not between 0 and EDAM_USER_NOTES_MAX
+      </li>
+      <li> BAD_DATA_FORMAT "maxNotes" - not between 0 and EDAM_USER_NOTES_MAX
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.notebookGuid" - if malformed
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.tagGuids" - if any are malformed
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.words" - if search string too long
+      </li>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Notebook.guid" - not found, by GUID
+      </li>
+      <li> "Note.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - filter
+     - guid
+    """
+    self.send_findNoteOffset(authenticationToken, filter, guid)
+    return self.recv_findNoteOffset()
+
+  def send_findNoteOffset(self, authenticationToken, filter, guid):
+    self._oprot.writeMessageBegin('findNoteOffset', TMessageType.CALL, self._seqid)
+    args = findNoteOffset_args()
+    args.authenticationToken = authenticationToken
+    args.filter = filter
+    args.guid = guid
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_findNoteOffset(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = findNoteOffset_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "findNoteOffset failed: unknown result");
+
+  def findNotesMetadata(self, authenticationToken, filter, offset, maxNotes, resultSpec):
+    """
+    Used to find the high-level information about a set of the notes from a
+    user's account based on various criteria specified via a NoteFilter object.
+    This should be used instead of 'findNotes' whenever the client doesn't
+    really need all of the deep structure of every Note and Resource, but
+    just wants a high-level list of information.  This will save time and
+    bandwidth.
+    
+    @param authenticationToken
+      Must be a valid token for the user's account unless the NoteFilter
+      'notebookGuid' is the GUID of a public notebook.
+    
+    @param filter
+      The list of criteria that will constrain the notes to be returned.
+    
+    @param offset
+      The numeric index of the first note to show within the sorted
+      results.  The numbering scheme starts with "0".  This can be used for
+      pagination.
+    
+    @param maxNotes
+      The mximum notes to return in this query.  The service will return a set
+      of notes that is no larger than this number, but may return fewer notes
+      if needed.  The NoteList.totalNotes field in the return value will
+      indicate whether there are more values available after the returned set.
+    
+    @param resultSpec
+      This specifies which information should be returned for each matching
+      Note. The fields on this structure can be used to eliminate data that
+      the client doesn't need, which will reduce the time and bandwidth
+      to receive and process the reply.
+    
+    @return
+      The list of notes that match the criteria.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "offset" - not between 0 and EDAM_USER_NOTES_MAX
+      </li>
+      <li> BAD_DATA_FORMAT "maxNotes" - not between 0 and EDAM_USER_NOTES_MAX
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.notebookGuid" - if malformed
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.tagGuids" - if any are malformed
+      </li>
+      <li> BAD_DATA_FORMAT "NoteFilter.words" - if search string too long
+      </li>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Notebook.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - filter
+     - offset
+     - maxNotes
+     - resultSpec
+    """
+    self.send_findNotesMetadata(authenticationToken, filter, offset, maxNotes, resultSpec)
+    return self.recv_findNotesMetadata()
+
+  def send_findNotesMetadata(self, authenticationToken, filter, offset, maxNotes, resultSpec):
+    self._oprot.writeMessageBegin('findNotesMetadata', TMessageType.CALL, self._seqid)
+    args = findNotesMetadata_args()
+    args.authenticationToken = authenticationToken
+    args.filter = filter
+    args.offset = offset
+    args.maxNotes = maxNotes
+    args.resultSpec = resultSpec
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_findNotesMetadata(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = findNotesMetadata_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "findNotesMetadata failed: unknown result");
 
   def findNoteCounts(self, authenticationToken, filter, withTrash):
     """
@@ -3380,7 +4050,8 @@ class Client(Iface):
     for each resource in the note, but the binary contents of the resources
     and their recognition data will be omitted.
     If the Note is found in a public notebook, the authenticationToken
-    will be ignored (so it could be an empty string).
+    will be ignored (so it could be an empty string).  The applicationData
+    fields are returned as keysOnly.
     
     @param guid
       The GUID of the note to be retrieved.
@@ -3457,6 +4128,188 @@ class Client(Iface):
     if result.notFoundException != None:
       raise result.notFoundException
     raise TApplicationException(TApplicationException.MISSING_RESULT, "getNote failed: unknown result");
+
+  def getNoteApplicationData(self, authenticationToken, guid):
+    """
+    Get all of the application data for the note identified by GUID,
+    with values returned within the LazyMap fullMap field.
+    If there are no applicationData entries, then a LazyMap
+    with an empty fullMap will be returned. If your application
+    only needs to fetch its own applicationData entry, use
+    getNoteApplicationDataEntry instead.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+    """
+    self.send_getNoteApplicationData(authenticationToken, guid)
+    return self.recv_getNoteApplicationData()
+
+  def send_getNoteApplicationData(self, authenticationToken, guid):
+    self._oprot.writeMessageBegin('getNoteApplicationData', TMessageType.CALL, self._seqid)
+    args = getNoteApplicationData_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_getNoteApplicationData(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = getNoteApplicationData_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "getNoteApplicationData failed: unknown result");
+
+  def getNoteApplicationDataEntry(self, authenticationToken, guid, key):
+    """
+    Get the value of a single entry in the applicationData map
+    for the note identified by GUID.
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Note.guid" - note not found, by GUID</li>
+      <li> "NoteAttributes.applicationData.key" - note not found, by key</li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+    """
+    self.send_getNoteApplicationDataEntry(authenticationToken, guid, key)
+    return self.recv_getNoteApplicationDataEntry()
+
+  def send_getNoteApplicationDataEntry(self, authenticationToken, guid, key):
+    self._oprot.writeMessageBegin('getNoteApplicationDataEntry', TMessageType.CALL, self._seqid)
+    args = getNoteApplicationDataEntry_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.key = key
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_getNoteApplicationDataEntry(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = getNoteApplicationDataEntry_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "getNoteApplicationDataEntry failed: unknown result");
+
+  def setNoteApplicationDataEntry(self, authenticationToken, guid, key, value):
+    """
+    Update, or create, an entry in the applicationData map for
+    the note identified by guid.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+     - value
+    """
+    self.send_setNoteApplicationDataEntry(authenticationToken, guid, key, value)
+    return self.recv_setNoteApplicationDataEntry()
+
+  def send_setNoteApplicationDataEntry(self, authenticationToken, guid, key, value):
+    self._oprot.writeMessageBegin('setNoteApplicationDataEntry', TMessageType.CALL, self._seqid)
+    args = setNoteApplicationDataEntry_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.key = key
+    args.value = value
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_setNoteApplicationDataEntry(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = setNoteApplicationDataEntry_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "setNoteApplicationDataEntry failed: unknown result");
+
+  def unsetNoteApplicationDataEntry(self, authenticationToken, guid, key):
+    """
+    Remove an entry identified by 'key' from the applicationData map for
+    the note identified by 'guid'. Silently ignores an unset of a
+    non-existing key.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+    """
+    self.send_unsetNoteApplicationDataEntry(authenticationToken, guid, key)
+    return self.recv_unsetNoteApplicationDataEntry()
+
+  def send_unsetNoteApplicationDataEntry(self, authenticationToken, guid, key):
+    self._oprot.writeMessageBegin('unsetNoteApplicationDataEntry', TMessageType.CALL, self._seqid)
+    args = unsetNoteApplicationDataEntry_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.key = key
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_unsetNoteApplicationDataEntry(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = unsetNoteApplicationDataEntry_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "unsetNoteApplicationDataEntry failed: unknown result");
 
   def getNoteContent(self, authenticationToken, guid):
     """
@@ -3805,11 +4658,15 @@ class Client(Iface):
   def updateNote(self, authenticationToken, note):
     """
     Submit a set of changes to a note to the service.  The provided data
-    must include the note's guid field for identification.
+    must include the note's guid field for identification. The note's
+    title must also be set.
     
     @param note
       A Note object containing the desired fields to be populated on
-      the service.
+      the service. With the exception of the note's title and guid, fields
+      that are not being changed do not need to be set. If the content is not
+      being modified, note.content should be left unset. If the list of
+      resources is not being modified, note.resources should be left unset.
     
     @return
       The metadata (no contents) for the Note on the server after the update
@@ -3903,7 +4760,7 @@ class Client(Iface):
   def deleteNote(self, authenticationToken, guid):
     """
     Moves the note into the trash. The note may still be undeleted, unless it
-    is expunged.  This is equivalent to calling udpateNote() after setting
+    is expunged.  This is equivalent to calling updateNote() after setting
     Note.active = false
     
     @param guid
@@ -3918,6 +4775,10 @@ class Client(Iface):
       </li>
     </ul>
     
+    @throws EDAMUserException <ul>
+      <li> DATA_CONFLICT "Note.guid" - the note is already deleted
+      </li>
+    </ul>
     @throws EDAMNotFoundException <ul>
       <li> "Note.guid" - not found, by GUID
       </li>
@@ -4356,7 +5217,8 @@ class Client(Iface):
     Returns the current state of the resource in the service with the
     provided GUID.
     If the Resource is found in a public notebook, the authenticationToken
-    will be ignored (so it could be an empty string).
+    will be ignored (so it could be an empty string).  Only the
+    keys for the applicationData will be returned.
     
     @param guid
       The GUID of the resource to be retrieved.
@@ -4432,6 +5294,187 @@ class Client(Iface):
       raise result.notFoundException
     raise TApplicationException(TApplicationException.MISSING_RESULT, "getResource failed: unknown result");
 
+  def getResourceApplicationData(self, authenticationToken, guid):
+    """
+    Get all of the application data for the Resource identified by GUID,
+    with values returned within the LazyMap fullMap field.
+    If there are no applicationData entries, then a LazyMap
+    with an empty fullMap will be returned. If your application
+    only needs to fetch its own applicationData entry, use
+    getResourceApplicationDataEntry instead.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+    """
+    self.send_getResourceApplicationData(authenticationToken, guid)
+    return self.recv_getResourceApplicationData()
+
+  def send_getResourceApplicationData(self, authenticationToken, guid):
+    self._oprot.writeMessageBegin('getResourceApplicationData', TMessageType.CALL, self._seqid)
+    args = getResourceApplicationData_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_getResourceApplicationData(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = getResourceApplicationData_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "getResourceApplicationData failed: unknown result");
+
+  def getResourceApplicationDataEntry(self, authenticationToken, guid, key):
+    """
+    Get the value of a single entry in the applicationData map
+    for the Resource identified by GUID.
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Resource.guid" - Resource not found, by GUID</li>
+      <li> "ResourceAttributes.applicationData.key" - Resource not found, by key</li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+    """
+    self.send_getResourceApplicationDataEntry(authenticationToken, guid, key)
+    return self.recv_getResourceApplicationDataEntry()
+
+  def send_getResourceApplicationDataEntry(self, authenticationToken, guid, key):
+    self._oprot.writeMessageBegin('getResourceApplicationDataEntry', TMessageType.CALL, self._seqid)
+    args = getResourceApplicationDataEntry_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.key = key
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_getResourceApplicationDataEntry(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = getResourceApplicationDataEntry_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "getResourceApplicationDataEntry failed: unknown result");
+
+  def setResourceApplicationDataEntry(self, authenticationToken, guid, key, value):
+    """
+    Update, or create, an entry in the applicationData map for
+    the Resource identified by guid.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+     - value
+    """
+    self.send_setResourceApplicationDataEntry(authenticationToken, guid, key, value)
+    return self.recv_setResourceApplicationDataEntry()
+
+  def send_setResourceApplicationDataEntry(self, authenticationToken, guid, key, value):
+    self._oprot.writeMessageBegin('setResourceApplicationDataEntry', TMessageType.CALL, self._seqid)
+    args = setResourceApplicationDataEntry_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.key = key
+    args.value = value
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_setResourceApplicationDataEntry(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = setResourceApplicationDataEntry_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "setResourceApplicationDataEntry failed: unknown result");
+
+  def unsetResourceApplicationDataEntry(self, authenticationToken, guid, key):
+    """
+    Remove an entry identified by 'key' from the applicationData map for
+    the Resource identified by 'guid'.
+    
+    Parameters:
+     - authenticationToken
+     - guid
+     - key
+    """
+    self.send_unsetResourceApplicationDataEntry(authenticationToken, guid, key)
+    return self.recv_unsetResourceApplicationDataEntry()
+
+  def send_unsetResourceApplicationDataEntry(self, authenticationToken, guid, key):
+    self._oprot.writeMessageBegin('unsetResourceApplicationDataEntry', TMessageType.CALL, self._seqid)
+    args = unsetResourceApplicationDataEntry_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.key = key
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_unsetResourceApplicationDataEntry(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = unsetResourceApplicationDataEntry_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.systemException != None:
+      raise result.systemException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "unsetResourceApplicationDataEntry failed: unknown result");
+
   def updateResource(self, authenticationToken, resource):
     """
     Submit a set of changes to a resource to the service.  This can be used
@@ -4455,11 +5498,6 @@ class Client(Iface):
          </li>
          <li>duration
          </li>
-         <li>recognition:  if this is provided, it must include the
-             data body for the resource recognition index data and the
-             recoFormat must be provided.  If absent,
-             the recognition on the server won't be changed.
-         </li>
          <li>attributes:  optional.  if present, the set of attributes will
               be replaced.
          </li>
@@ -4475,8 +5513,6 @@ class Client(Iface):
       <li> BAD_DATA_FORMAT "Resource.mime" - invalid resource MIME type
       </li>
       <li> BAD_DATA_FORMAT "ResourceAttributes.*" - bad resource string
-      </li>
-      <li> DATA_REQUIRED "Resource.data" - resource data body missing
       </li>
       <li> LIMIT_REACHED "ResourceAttribute.*" - attribute string too long
       </li>
@@ -5090,6 +6126,77 @@ class Client(Iface):
       raise result.systemException
     raise TApplicationException(TApplicationException.MISSING_RESULT, "createSharedNotebook failed: unknown result");
 
+  def sendMessageToSharedNotebookMembers(self, authenticationToken, notebookGuid, messageText, recipients):
+    """
+    Send a reminder message to some or all of the email addresses that a notebook has been
+    shared with. The message includes the current link to view the notebook.
+    @param authenticationToken
+      The auth token of the user with permissions to share the notebook
+    @param notebookGuid
+      The guid of the shared notebook
+    @param messageText
+     User provided text to include in the email
+    @param recipients
+     The email addresses of the recipients. If this list is empty then all of the
+     users that the notebook has been shared with are emailed.
+     If an email address doesn't correspond to share invite members then that address
+     is ignored.
+    @return
+     The number of messages sent
+    @throws EDAMUserException <ul>
+      <li> LIMIT_REACHED "(recipients)" -
+        The email can't be sent because this would exceed the user's daily
+        email limit.
+      </li>
+      <li> PERMISSION_DENIED "Notebook" - private note, user doesn't own
+      </li>
+    </ul>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Notebook.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - notebookGuid
+     - messageText
+     - recipients
+    """
+    self.send_sendMessageToSharedNotebookMembers(authenticationToken, notebookGuid, messageText, recipients)
+    return self.recv_sendMessageToSharedNotebookMembers()
+
+  def send_sendMessageToSharedNotebookMembers(self, authenticationToken, notebookGuid, messageText, recipients):
+    self._oprot.writeMessageBegin('sendMessageToSharedNotebookMembers', TMessageType.CALL, self._seqid)
+    args = sendMessageToSharedNotebookMembers_args()
+    args.authenticationToken = authenticationToken
+    args.notebookGuid = notebookGuid
+    args.messageText = messageText
+    args.recipients = recipients
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_sendMessageToSharedNotebookMembers(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = sendMessageToSharedNotebookMembers_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    if result.systemException != None:
+      raise result.systemException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "sendMessageToSharedNotebookMembers failed: unknown result");
+
   def listSharedNotebooks(self, authenticationToken):
     """
     Lists the collection of shared notebooks for all notebooks in the
@@ -5547,6 +6654,8 @@ class Client(Iface):
       <li> DATA_REQUIRED "Note.content" -
         if the caller provides a Note parameter with no content
       </li>
+      <li> ENML_VALIDATION "*" - note content doesn't validate against DTD
+      </li>
       <li> DATA_REQUIRED "NoteEmailParameters.note" -
         if no guid or note provided
       </li>
@@ -5593,6 +6702,187 @@ class Client(Iface):
       raise result.systemException
     return
 
+  def shareNote(self, authenticationToken, guid):
+    """
+    If this note is not already shared (via its own direct URL), then this
+    will start sharing that note.
+    This will return the secret "Note Key" for this note that
+    can currently be used in conjunction with the Note's GUID to gain direct
+    read-only access to the Note.
+    If the note is already shared, then this won't make any changes to the
+    note, and the existing "Note Key" will be returned.  The only way to change
+    the Note Key for an existing note is to stopSharingNote first, and then
+    call this function.
+    
+    @param guid
+      The GUID of the note to be shared.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "Note.guid" - if the parameter is missing
+      </li>
+      <li> PERMISSION_DENIED "Note" - private note, user doesn't own
+      </li>
+    </ul>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Note.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - guid
+    """
+    self.send_shareNote(authenticationToken, guid)
+    return self.recv_shareNote()
+
+  def send_shareNote(self, authenticationToken, guid):
+    self._oprot.writeMessageBegin('shareNote', TMessageType.CALL, self._seqid)
+    args = shareNote_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_shareNote(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = shareNote_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    if result.systemException != None:
+      raise result.systemException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "shareNote failed: unknown result");
+
+  def stopSharingNote(self, authenticationToken, guid):
+    """
+    If this note is not already shared then this will stop sharing that note
+    and invalidate its "Note Key", so any existing URLs to access that Note
+    will stop working.
+    If the Note is not shared, then this function will do nothing.
+    
+    @param guid
+      The GUID of the note to be un-shared.
+    
+    @throws EDAMUserException <ul>
+      <li> BAD_DATA_FORMAT "Note.guid" - if the parameter is missing
+      </li>
+      <li> PERMISSION_DENIED "Note" - private note, user doesn't own
+      </li>
+    </ul>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "Note.guid" - not found, by GUID
+      </li>
+    </ul>
+    
+    Parameters:
+     - authenticationToken
+     - guid
+    """
+    self.send_stopSharingNote(authenticationToken, guid)
+    self.recv_stopSharingNote()
+
+  def send_stopSharingNote(self, authenticationToken, guid):
+    self._oprot.writeMessageBegin('stopSharingNote', TMessageType.CALL, self._seqid)
+    args = stopSharingNote_args()
+    args.authenticationToken = authenticationToken
+    args.guid = guid
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_stopSharingNote(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = stopSharingNote_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.userException != None:
+      raise result.userException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    if result.systemException != None:
+      raise result.systemException
+    return
+
+  def authenticateToSharedNote(self, guid, noteKey):
+    """
+    Asks the service to produce an authentication token that can be used to
+    access the contents of a single Note which was individually shared
+    from someone's account.
+    This authenticationToken can be used with the various other NoteStore
+    calls to find and retrieve the Note and its directly-referenced children.
+    
+    @param guid
+      The GUID identifying this Note on this shard.
+    
+    @param noteKey
+      The 'noteKey' identifier from the Note that was originally created via
+      a call to shareNote() and then given to a recipient to access.
+    
+    @throws EDAMUserException <ul>
+      <li> PERMISSION_DENIED "Note" - the Note with that GUID is either not
+        shared, or the noteKey doesn't match the current key for this note
+      </li>
+    </ul>
+    
+    @throws EDAMNotFoundException <ul>
+      <li> "guid" - the note with that GUID is not found
+      </li>
+    </ul>
+    
+    Parameters:
+     - guid
+     - noteKey
+    """
+    self.send_authenticateToSharedNote(guid, noteKey)
+    return self.recv_authenticateToSharedNote()
+
+  def send_authenticateToSharedNote(self, guid, noteKey):
+    self._oprot.writeMessageBegin('authenticateToSharedNote', TMessageType.CALL, self._seqid)
+    args = authenticateToSharedNote_args()
+    args.guid = guid
+    args.noteKey = noteKey
+    args.write(self._oprot)
+    self._oprot.writeMessageEnd()
+    self._oprot.trans.flush()
+
+  def recv_authenticateToSharedNote(self, ):
+    (fname, mtype, rseqid) = self._iprot.readMessageBegin()
+    if mtype == TMessageType.EXCEPTION:
+      x = TApplicationException()
+      x.read(self._iprot)
+      self._iprot.readMessageEnd()
+      raise x
+    result = authenticateToSharedNote_result()
+    result.read(self._iprot)
+    self._iprot.readMessageEnd()
+    if result.success != None:
+      return result.success
+    if result.userException != None:
+      raise result.userException
+    if result.notFoundException != None:
+      raise result.notFoundException
+    if result.systemException != None:
+      raise result.systemException
+    raise TApplicationException(TApplicationException.MISSING_RESULT, "authenticateToSharedNote failed: unknown result");
+
 
 class Processor(Iface, TProcessor):
   def __init__(self, handler):
@@ -5600,6 +6890,7 @@ class Processor(Iface, TProcessor):
     self._processMap = {}
     self._processMap["getSyncState"] = Processor.process_getSyncState
     self._processMap["getSyncChunk"] = Processor.process_getSyncChunk
+    self._processMap["getFilteredSyncChunk"] = Processor.process_getFilteredSyncChunk
     self._processMap["getLinkedNotebookSyncState"] = Processor.process_getLinkedNotebookSyncState
     self._processMap["getLinkedNotebookSyncChunk"] = Processor.process_getLinkedNotebookSyncChunk
     self._processMap["listNotebooks"] = Processor.process_listNotebooks
@@ -5621,8 +6912,14 @@ class Processor(Iface, TProcessor):
     self._processMap["updateSearch"] = Processor.process_updateSearch
     self._processMap["expungeSearch"] = Processor.process_expungeSearch
     self._processMap["findNotes"] = Processor.process_findNotes
+    self._processMap["findNoteOffset"] = Processor.process_findNoteOffset
+    self._processMap["findNotesMetadata"] = Processor.process_findNotesMetadata
     self._processMap["findNoteCounts"] = Processor.process_findNoteCounts
     self._processMap["getNote"] = Processor.process_getNote
+    self._processMap["getNoteApplicationData"] = Processor.process_getNoteApplicationData
+    self._processMap["getNoteApplicationDataEntry"] = Processor.process_getNoteApplicationDataEntry
+    self._processMap["setNoteApplicationDataEntry"] = Processor.process_setNoteApplicationDataEntry
+    self._processMap["unsetNoteApplicationDataEntry"] = Processor.process_unsetNoteApplicationDataEntry
     self._processMap["getNoteContent"] = Processor.process_getNoteContent
     self._processMap["getNoteSearchText"] = Processor.process_getNoteSearchText
     self._processMap["getResourceSearchText"] = Processor.process_getResourceSearchText
@@ -5637,6 +6934,10 @@ class Processor(Iface, TProcessor):
     self._processMap["listNoteVersions"] = Processor.process_listNoteVersions
     self._processMap["getNoteVersion"] = Processor.process_getNoteVersion
     self._processMap["getResource"] = Processor.process_getResource
+    self._processMap["getResourceApplicationData"] = Processor.process_getResourceApplicationData
+    self._processMap["getResourceApplicationDataEntry"] = Processor.process_getResourceApplicationDataEntry
+    self._processMap["setResourceApplicationDataEntry"] = Processor.process_setResourceApplicationDataEntry
+    self._processMap["unsetResourceApplicationDataEntry"] = Processor.process_unsetResourceApplicationDataEntry
     self._processMap["updateResource"] = Processor.process_updateResource
     self._processMap["getResourceData"] = Processor.process_getResourceData
     self._processMap["getResourceByHash"] = Processor.process_getResourceByHash
@@ -5648,6 +6949,7 @@ class Processor(Iface, TProcessor):
     self._processMap["getRandomAd"] = Processor.process_getRandomAd
     self._processMap["getPublicNotebook"] = Processor.process_getPublicNotebook
     self._processMap["createSharedNotebook"] = Processor.process_createSharedNotebook
+    self._processMap["sendMessageToSharedNotebookMembers"] = Processor.process_sendMessageToSharedNotebookMembers
     self._processMap["listSharedNotebooks"] = Processor.process_listSharedNotebooks
     self._processMap["expungeSharedNotebooks"] = Processor.process_expungeSharedNotebooks
     self._processMap["createLinkedNotebook"] = Processor.process_createLinkedNotebook
@@ -5657,6 +6959,9 @@ class Processor(Iface, TProcessor):
     self._processMap["authenticateToSharedNotebook"] = Processor.process_authenticateToSharedNotebook
     self._processMap["getSharedNotebookByAuth"] = Processor.process_getSharedNotebookByAuth
     self._processMap["emailNote"] = Processor.process_emailNote
+    self._processMap["shareNote"] = Processor.process_shareNote
+    self._processMap["stopSharingNote"] = Processor.process_stopSharingNote
+    self._processMap["authenticateToSharedNote"] = Processor.process_authenticateToSharedNote
 
   def process(self, iprot, oprot):
     (name, type, seqid) = iprot.readMessageBegin()
@@ -5701,6 +7006,22 @@ class Processor(Iface, TProcessor):
     except evernote.edam.error.ttypes.EDAMSystemException, systemException:
       result.systemException = systemException
     oprot.writeMessageBegin("getSyncChunk", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_getFilteredSyncChunk(self, seqid, iprot, oprot):
+    args = getFilteredSyncChunk_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = getFilteredSyncChunk_result()
+    try:
+      result.success = self._handler.getFilteredSyncChunk(args.authenticationToken, args.afterUSN, args.maxEntries, args.filter)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    oprot.writeMessageBegin("getFilteredSyncChunk", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -6071,6 +7392,42 @@ class Processor(Iface, TProcessor):
     oprot.writeMessageEnd()
     oprot.trans.flush()
 
+  def process_findNoteOffset(self, seqid, iprot, oprot):
+    args = findNoteOffset_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = findNoteOffset_result()
+    try:
+      result.success = self._handler.findNoteOffset(args.authenticationToken, args.filter, args.guid)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("findNoteOffset", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_findNotesMetadata(self, seqid, iprot, oprot):
+    args = findNotesMetadata_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = findNotesMetadata_result()
+    try:
+      result.success = self._handler.findNotesMetadata(args.authenticationToken, args.filter, args.offset, args.maxNotes, args.resultSpec)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("findNotesMetadata", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
   def process_findNoteCounts(self, seqid, iprot, oprot):
     args = findNoteCounts_args()
     args.read(iprot)
@@ -6103,6 +7460,78 @@ class Processor(Iface, TProcessor):
     except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
       result.notFoundException = notFoundException
     oprot.writeMessageBegin("getNote", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_getNoteApplicationData(self, seqid, iprot, oprot):
+    args = getNoteApplicationData_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = getNoteApplicationData_result()
+    try:
+      result.success = self._handler.getNoteApplicationData(args.authenticationToken, args.guid)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("getNoteApplicationData", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_getNoteApplicationDataEntry(self, seqid, iprot, oprot):
+    args = getNoteApplicationDataEntry_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = getNoteApplicationDataEntry_result()
+    try:
+      result.success = self._handler.getNoteApplicationDataEntry(args.authenticationToken, args.guid, args.key)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("getNoteApplicationDataEntry", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_setNoteApplicationDataEntry(self, seqid, iprot, oprot):
+    args = setNoteApplicationDataEntry_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = setNoteApplicationDataEntry_result()
+    try:
+      result.success = self._handler.setNoteApplicationDataEntry(args.authenticationToken, args.guid, args.key, args.value)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("setNoteApplicationDataEntry", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_unsetNoteApplicationDataEntry(self, seqid, iprot, oprot):
+    args = unsetNoteApplicationDataEntry_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = unsetNoteApplicationDataEntry_result()
+    try:
+      result.success = self._handler.unsetNoteApplicationDataEntry(args.authenticationToken, args.guid, args.key)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("unsetNoteApplicationDataEntry", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -6357,6 +7786,78 @@ class Processor(Iface, TProcessor):
     oprot.writeMessageEnd()
     oprot.trans.flush()
 
+  def process_getResourceApplicationData(self, seqid, iprot, oprot):
+    args = getResourceApplicationData_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = getResourceApplicationData_result()
+    try:
+      result.success = self._handler.getResourceApplicationData(args.authenticationToken, args.guid)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("getResourceApplicationData", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_getResourceApplicationDataEntry(self, seqid, iprot, oprot):
+    args = getResourceApplicationDataEntry_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = getResourceApplicationDataEntry_result()
+    try:
+      result.success = self._handler.getResourceApplicationDataEntry(args.authenticationToken, args.guid, args.key)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("getResourceApplicationDataEntry", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_setResourceApplicationDataEntry(self, seqid, iprot, oprot):
+    args = setResourceApplicationDataEntry_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = setResourceApplicationDataEntry_result()
+    try:
+      result.success = self._handler.setResourceApplicationDataEntry(args.authenticationToken, args.guid, args.key, args.value)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("setResourceApplicationDataEntry", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_unsetResourceApplicationDataEntry(self, seqid, iprot, oprot):
+    args = unsetResourceApplicationDataEntry_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = unsetResourceApplicationDataEntry_result()
+    try:
+      result.success = self._handler.unsetResourceApplicationDataEntry(args.authenticationToken, args.guid, args.key)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    oprot.writeMessageBegin("unsetResourceApplicationDataEntry", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
   def process_updateResource(self, seqid, iprot, oprot):
     args = updateResource_args()
     args.read(iprot)
@@ -6547,6 +8048,24 @@ class Processor(Iface, TProcessor):
     oprot.writeMessageEnd()
     oprot.trans.flush()
 
+  def process_sendMessageToSharedNotebookMembers(self, seqid, iprot, oprot):
+    args = sendMessageToSharedNotebookMembers_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = sendMessageToSharedNotebookMembers_result()
+    try:
+      result.success = self._handler.sendMessageToSharedNotebookMembers(args.authenticationToken, args.notebookGuid, args.messageText, args.recipients)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    oprot.writeMessageBegin("sendMessageToSharedNotebookMembers", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
   def process_listSharedNotebooks(self, seqid, iprot, oprot):
     args = listSharedNotebooks_args()
     args.read(iprot)
@@ -6705,6 +8224,60 @@ class Processor(Iface, TProcessor):
     except evernote.edam.error.ttypes.EDAMSystemException, systemException:
       result.systemException = systemException
     oprot.writeMessageBegin("emailNote", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_shareNote(self, seqid, iprot, oprot):
+    args = shareNote_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = shareNote_result()
+    try:
+      result.success = self._handler.shareNote(args.authenticationToken, args.guid)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    oprot.writeMessageBegin("shareNote", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_stopSharingNote(self, seqid, iprot, oprot):
+    args = stopSharingNote_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = stopSharingNote_result()
+    try:
+      self._handler.stopSharingNote(args.authenticationToken, args.guid)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    oprot.writeMessageBegin("stopSharingNote", TMessageType.REPLY, seqid)
+    result.write(oprot)
+    oprot.writeMessageEnd()
+    oprot.trans.flush()
+
+  def process_authenticateToSharedNote(self, seqid, iprot, oprot):
+    args = authenticateToSharedNote_args()
+    args.read(iprot)
+    iprot.readMessageEnd()
+    result = authenticateToSharedNote_result()
+    try:
+      result.success = self._handler.authenticateToSharedNote(args.guid, args.noteKey)
+    except evernote.edam.error.ttypes.EDAMUserException, userException:
+      result.userException = userException
+    except evernote.edam.error.ttypes.EDAMNotFoundException, notFoundException:
+      result.notFoundException = notFoundException
+    except evernote.edam.error.ttypes.EDAMSystemException, systemException:
+      result.systemException = systemException
+    oprot.writeMessageBegin("authenticateToSharedNote", TMessageType.REPLY, seqid)
     result.write(oprot)
     oprot.writeMessageEnd()
     oprot.trans.flush()
@@ -6998,6 +8571,181 @@ class getSyncChunk_result(object):
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('getSyncChunk_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getFilteredSyncChunk_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - afterUSN
+   - maxEntries
+   - filter
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.I32, 'afterUSN', None, None, ), # 2
+    (3, TType.I32, 'maxEntries', None, None, ), # 3
+    (4, TType.STRUCT, 'filter', (SyncChunkFilter, SyncChunkFilter.thrift_spec), None, ), # 4
+  )
+
+  def __init__(self, authenticationToken=None, afterUSN=None, maxEntries=None, filter=None,):
+    self.authenticationToken = authenticationToken
+    self.afterUSN = afterUSN
+    self.maxEntries = maxEntries
+    self.filter = filter
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.I32:
+          self.afterUSN = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.I32:
+          self.maxEntries = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.STRUCT:
+          self.filter = SyncChunkFilter()
+          self.filter.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getFilteredSyncChunk_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.afterUSN != None:
+      oprot.writeFieldBegin('afterUSN', TType.I32, 2)
+      oprot.writeI32(self.afterUSN)
+      oprot.writeFieldEnd()
+    if self.maxEntries != None:
+      oprot.writeFieldBegin('maxEntries', TType.I32, 3)
+      oprot.writeI32(self.maxEntries)
+      oprot.writeFieldEnd()
+    if self.filter != None:
+      oprot.writeFieldBegin('filter', TType.STRUCT, 4)
+      self.filter.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getFilteredSyncChunk_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+  """
+
+  thrift_spec = (
+    (0, TType.STRUCT, 'success', (SyncChunk, SyncChunk.thrift_spec), None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRUCT:
+          self.success = SyncChunk()
+          self.success.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getFilteredSyncChunk_result')
     if self.success != None:
       oprot.writeFieldBegin('success', TType.STRUCT, 0)
       self.success.write(oprot)
@@ -7475,11 +9223,11 @@ class listNotebooks_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype156, _size153) = iprot.readListBegin()
-          for _i157 in xrange(_size153):
-            _elem158 = evernote.edam.type.ttypes.Notebook()
-            _elem158.read(iprot)
-            self.success.append(_elem158)
+          (_etype184, _size181) = iprot.readListBegin()
+          for _i185 in xrange(_size181):
+            _elem186 = evernote.edam.type.ttypes.Notebook()
+            _elem186.read(iprot)
+            self.success.append(_elem186)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -7508,8 +9256,8 @@ class listNotebooks_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRUCT, len(self.success))
-      for iter159 in self.success:
-        iter159.write(oprot)
+      for iter187 in self.success:
+        iter187.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -8398,11 +10146,11 @@ class listTags_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype163, _size160) = iprot.readListBegin()
-          for _i164 in xrange(_size160):
-            _elem165 = evernote.edam.type.ttypes.Tag()
-            _elem165.read(iprot)
-            self.success.append(_elem165)
+          (_etype191, _size188) = iprot.readListBegin()
+          for _i192 in xrange(_size188):
+            _elem193 = evernote.edam.type.ttypes.Tag()
+            _elem193.read(iprot)
+            self.success.append(_elem193)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -8431,8 +10179,8 @@ class listTags_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRUCT, len(self.success))
-      for iter166 in self.success:
-        iter166.write(oprot)
+      for iter194 in self.success:
+        iter194.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -8559,11 +10307,11 @@ class listTagsByNotebook_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype170, _size167) = iprot.readListBegin()
-          for _i171 in xrange(_size167):
-            _elem172 = evernote.edam.type.ttypes.Tag()
-            _elem172.read(iprot)
-            self.success.append(_elem172)
+          (_etype198, _size195) = iprot.readListBegin()
+          for _i199 in xrange(_size195):
+            _elem200 = evernote.edam.type.ttypes.Tag()
+            _elem200.read(iprot)
+            self.success.append(_elem200)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -8598,8 +10346,8 @@ class listTagsByNotebook_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRUCT, len(self.success))
-      for iter173 in self.success:
-        iter173.write(oprot)
+      for iter201 in self.success:
+        iter201.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -9518,11 +11266,11 @@ class listSearches_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype177, _size174) = iprot.readListBegin()
-          for _i178 in xrange(_size174):
-            _elem179 = evernote.edam.type.ttypes.SavedSearch()
-            _elem179.read(iprot)
-            self.success.append(_elem179)
+          (_etype205, _size202) = iprot.readListBegin()
+          for _i206 in xrange(_size202):
+            _elem207 = evernote.edam.type.ttypes.SavedSearch()
+            _elem207.read(iprot)
+            self.success.append(_elem207)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -9551,8 +11299,8 @@ class listSearches_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRUCT, len(self.success))
-      for iter180 in self.success:
-        iter180.write(oprot)
+      for iter208 in self.success:
+        iter208.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -10404,6 +12152,382 @@ class findNotes_result(object):
   def __ne__(self, other):
     return not (self == other)
 
+class findNoteOffset_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - filter
+   - guid
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRUCT, 'filter', (NoteFilter, NoteFilter.thrift_spec), None, ), # 2
+    (3, TType.STRING, 'guid', None, None, ), # 3
+  )
+
+  def __init__(self, authenticationToken=None, filter=None, guid=None,):
+    self.authenticationToken = authenticationToken
+    self.filter = filter
+    self.guid = guid
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.filter = NoteFilter()
+          self.filter.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('findNoteOffset_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.filter != None:
+      oprot.writeFieldBegin('filter', TType.STRUCT, 2)
+      self.filter.write(oprot)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 3)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class findNoteOffset_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.I32, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.I32:
+          self.success = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('findNoteOffset_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.I32, 0)
+      oprot.writeI32(self.success)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class findNotesMetadata_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - filter
+   - offset
+   - maxNotes
+   - resultSpec
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRUCT, 'filter', (NoteFilter, NoteFilter.thrift_spec), None, ), # 2
+    (3, TType.I32, 'offset', None, None, ), # 3
+    (4, TType.I32, 'maxNotes', None, None, ), # 4
+    (5, TType.STRUCT, 'resultSpec', (NotesMetadataResultSpec, NotesMetadataResultSpec.thrift_spec), None, ), # 5
+  )
+
+  def __init__(self, authenticationToken=None, filter=None, offset=None, maxNotes=None, resultSpec=None,):
+    self.authenticationToken = authenticationToken
+    self.filter = filter
+    self.offset = offset
+    self.maxNotes = maxNotes
+    self.resultSpec = resultSpec
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.filter = NoteFilter()
+          self.filter.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.I32:
+          self.offset = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.I32:
+          self.maxNotes = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 5:
+        if ftype == TType.STRUCT:
+          self.resultSpec = NotesMetadataResultSpec()
+          self.resultSpec.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('findNotesMetadata_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.filter != None:
+      oprot.writeFieldBegin('filter', TType.STRUCT, 2)
+      self.filter.write(oprot)
+      oprot.writeFieldEnd()
+    if self.offset != None:
+      oprot.writeFieldBegin('offset', TType.I32, 3)
+      oprot.writeI32(self.offset)
+      oprot.writeFieldEnd()
+    if self.maxNotes != None:
+      oprot.writeFieldBegin('maxNotes', TType.I32, 4)
+      oprot.writeI32(self.maxNotes)
+      oprot.writeFieldEnd()
+    if self.resultSpec != None:
+      oprot.writeFieldBegin('resultSpec', TType.STRUCT, 5)
+      self.resultSpec.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class findNotesMetadata_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.STRUCT, 'success', (NotesMetadataList, NotesMetadataList.thrift_spec), None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRUCT:
+          self.success = NotesMetadataList()
+          self.success.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('findNotesMetadata_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
 class findNoteCounts_args(object):
   """
   Attributes:
@@ -10764,6 +12888,703 @@ class getNote_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.STRUCT, 0)
       self.success.write(oprot)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getNoteApplicationData_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+  )
+
+  def __init__(self, authenticationToken=None, guid=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getNoteApplicationData_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getNoteApplicationData_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.STRUCT, 'success', (evernote.edam.type.ttypes.LazyMap, evernote.edam.type.ttypes.LazyMap.thrift_spec), None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRUCT:
+          self.success = evernote.edam.type.ttypes.LazyMap()
+          self.success.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getNoteApplicationData_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getNoteApplicationDataEntry_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+   - key
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+    (3, TType.STRING, 'key', None, None, ), # 3
+  )
+
+  def __init__(self, authenticationToken=None, guid=None, key=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+    self.key = key
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.key = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getNoteApplicationDataEntry_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    if self.key != None:
+      oprot.writeFieldBegin('key', TType.STRING, 3)
+      oprot.writeString(self.key)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getNoteApplicationDataEntry_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.STRING, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRING:
+          self.success = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getNoteApplicationDataEntry_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRING, 0)
+      oprot.writeString(self.success)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class setNoteApplicationDataEntry_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+   - key
+   - value
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+    (3, TType.STRING, 'key', None, None, ), # 3
+    (4, TType.STRING, 'value', None, None, ), # 4
+  )
+
+  def __init__(self, authenticationToken=None, guid=None, key=None, value=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+    self.key = key
+    self.value = value
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.key = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.STRING:
+          self.value = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('setNoteApplicationDataEntry_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    if self.key != None:
+      oprot.writeFieldBegin('key', TType.STRING, 3)
+      oprot.writeString(self.key)
+      oprot.writeFieldEnd()
+    if self.value != None:
+      oprot.writeFieldBegin('value', TType.STRING, 4)
+      oprot.writeString(self.value)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class setNoteApplicationDataEntry_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.I32, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.I32:
+          self.success = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('setNoteApplicationDataEntry_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.I32, 0)
+      oprot.writeI32(self.success)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class unsetNoteApplicationDataEntry_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+   - key
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+    (3, TType.STRING, 'key', None, None, ), # 3
+  )
+
+  def __init__(self, authenticationToken=None, guid=None, key=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+    self.key = key
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.key = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('unsetNoteApplicationDataEntry_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    if self.key != None:
+      oprot.writeFieldBegin('key', TType.STRING, 3)
+      oprot.writeString(self.key)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class unsetNoteApplicationDataEntry_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.I32, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.I32:
+          self.success = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('unsetNoteApplicationDataEntry_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.I32, 0)
+      oprot.writeI32(self.success)
       oprot.writeFieldEnd()
     if self.userException != None:
       oprot.writeFieldBegin('userException', TType.STRUCT, 1)
@@ -11403,10 +14224,10 @@ class getNoteTagNames_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype184, _size181) = iprot.readListBegin()
-          for _i185 in xrange(_size181):
-            _elem186 = iprot.readString();
-            self.success.append(_elem186)
+          (_etype212, _size209) = iprot.readListBegin()
+          for _i213 in xrange(_size209):
+            _elem214 = iprot.readString();
+            self.success.append(_elem214)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -11441,8 +14262,8 @@ class getNoteTagNames_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRING, len(self.success))
-      for iter187 in self.success:
-        oprot.writeString(iter187)
+      for iter215 in self.success:
+        oprot.writeString(iter215)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -12157,10 +14978,10 @@ class expungeNotes_args(object):
       elif fid == 2:
         if ftype == TType.LIST:
           self.noteGuids = []
-          (_etype191, _size188) = iprot.readListBegin()
-          for _i192 in xrange(_size188):
-            _elem193 = iprot.readString();
-            self.noteGuids.append(_elem193)
+          (_etype219, _size216) = iprot.readListBegin()
+          for _i220 in xrange(_size216):
+            _elem221 = iprot.readString();
+            self.noteGuids.append(_elem221)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -12181,8 +15002,8 @@ class expungeNotes_args(object):
     if self.noteGuids != None:
       oprot.writeFieldBegin('noteGuids', TType.LIST, 2)
       oprot.writeListBegin(TType.STRING, len(self.noteGuids))
-      for iter194 in self.noteGuids:
-        oprot.writeString(iter194)
+      for iter222 in self.noteGuids:
+        oprot.writeString(iter222)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
@@ -12707,11 +15528,11 @@ class listNoteVersions_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype198, _size195) = iprot.readListBegin()
-          for _i199 in xrange(_size195):
-            _elem200 = NoteVersionId()
-            _elem200.read(iprot)
-            self.success.append(_elem200)
+          (_etype226, _size223) = iprot.readListBegin()
+          for _i227 in xrange(_size223):
+            _elem228 = NoteVersionId()
+            _elem228.read(iprot)
+            self.success.append(_elem228)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -12746,8 +15567,8 @@ class listNoteVersions_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRUCT, len(self.success))
-      for iter201 in self.success:
-        iter201.write(oprot)
+      for iter229 in self.success:
+        iter229.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -13171,6 +15992,703 @@ class getResource_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.STRUCT, 0)
       self.success.write(oprot)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getResourceApplicationData_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+  )
+
+  def __init__(self, authenticationToken=None, guid=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getResourceApplicationData_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getResourceApplicationData_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.STRUCT, 'success', (evernote.edam.type.ttypes.LazyMap, evernote.edam.type.ttypes.LazyMap.thrift_spec), None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRUCT:
+          self.success = evernote.edam.type.ttypes.LazyMap()
+          self.success.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getResourceApplicationData_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getResourceApplicationDataEntry_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+   - key
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+    (3, TType.STRING, 'key', None, None, ), # 3
+  )
+
+  def __init__(self, authenticationToken=None, guid=None, key=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+    self.key = key
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.key = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getResourceApplicationDataEntry_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    if self.key != None:
+      oprot.writeFieldBegin('key', TType.STRING, 3)
+      oprot.writeString(self.key)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class getResourceApplicationDataEntry_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.STRING, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRING:
+          self.success = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('getResourceApplicationDataEntry_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRING, 0)
+      oprot.writeString(self.success)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class setResourceApplicationDataEntry_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+   - key
+   - value
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+    (3, TType.STRING, 'key', None, None, ), # 3
+    (4, TType.STRING, 'value', None, None, ), # 4
+  )
+
+  def __init__(self, authenticationToken=None, guid=None, key=None, value=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+    self.key = key
+    self.value = value
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.key = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.STRING:
+          self.value = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('setResourceApplicationDataEntry_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    if self.key != None:
+      oprot.writeFieldBegin('key', TType.STRING, 3)
+      oprot.writeString(self.key)
+      oprot.writeFieldEnd()
+    if self.value != None:
+      oprot.writeFieldBegin('value', TType.STRING, 4)
+      oprot.writeString(self.value)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class setResourceApplicationDataEntry_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.I32, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.I32:
+          self.success = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('setResourceApplicationDataEntry_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.I32, 0)
+      oprot.writeI32(self.success)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 2)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 3)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class unsetResourceApplicationDataEntry_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+   - key
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+    (3, TType.STRING, 'key', None, None, ), # 3
+  )
+
+  def __init__(self, authenticationToken=None, guid=None, key=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+    self.key = key
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.key = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('unsetResourceApplicationDataEntry_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    if self.key != None:
+      oprot.writeFieldBegin('key', TType.STRING, 3)
+      oprot.writeString(self.key)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class unsetResourceApplicationDataEntry_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - systemException
+   - notFoundException
+  """
+
+  thrift_spec = (
+    (0, TType.I32, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, systemException=None, notFoundException=None,):
+    self.success = success
+    self.userException = userException
+    self.systemException = systemException
+    self.notFoundException = notFoundException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.I32:
+          self.success = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('unsetResourceApplicationDataEntry_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.I32, 0)
+      oprot.writeI32(self.success)
       oprot.writeFieldEnd()
     if self.userException != None:
       oprot.writeFieldBegin('userException', TType.STRUCT, 1)
@@ -14458,11 +17976,11 @@ class getAds_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype205, _size202) = iprot.readListBegin()
-          for _i206 in xrange(_size202):
-            _elem207 = evernote.edam.type.ttypes.Ad()
-            _elem207.read(iprot)
-            self.success.append(_elem207)
+          (_etype233, _size230) = iprot.readListBegin()
+          for _i234 in xrange(_size230):
+            _elem235 = evernote.edam.type.ttypes.Ad()
+            _elem235.read(iprot)
+            self.success.append(_elem235)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -14491,8 +18009,8 @@ class getAds_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRUCT, len(self.success))
-      for iter208 in self.success:
-        iter208.write(oprot)
+      for iter236 in self.success:
+        iter236.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -14982,6 +18500,200 @@ class createSharedNotebook_result(object):
   def __ne__(self, other):
     return not (self == other)
 
+class sendMessageToSharedNotebookMembers_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - notebookGuid
+   - messageText
+   - recipients
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'notebookGuid', None, None, ), # 2
+    (3, TType.STRING, 'messageText', None, None, ), # 3
+    (4, TType.LIST, 'recipients', (TType.STRING,None), None, ), # 4
+  )
+
+  def __init__(self, authenticationToken=None, notebookGuid=None, messageText=None, recipients=None,):
+    self.authenticationToken = authenticationToken
+    self.notebookGuid = notebookGuid
+    self.messageText = messageText
+    self.recipients = recipients
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.notebookGuid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRING:
+          self.messageText = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 4:
+        if ftype == TType.LIST:
+          self.recipients = []
+          (_etype240, _size237) = iprot.readListBegin()
+          for _i241 in xrange(_size237):
+            _elem242 = iprot.readString();
+            self.recipients.append(_elem242)
+          iprot.readListEnd()
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('sendMessageToSharedNotebookMembers_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.notebookGuid != None:
+      oprot.writeFieldBegin('notebookGuid', TType.STRING, 2)
+      oprot.writeString(self.notebookGuid)
+      oprot.writeFieldEnd()
+    if self.messageText != None:
+      oprot.writeFieldBegin('messageText', TType.STRING, 3)
+      oprot.writeString(self.messageText)
+      oprot.writeFieldEnd()
+    if self.recipients != None:
+      oprot.writeFieldBegin('recipients', TType.LIST, 4)
+      oprot.writeListBegin(TType.STRING, len(self.recipients))
+      for iter243 in self.recipients:
+        oprot.writeString(iter243)
+      oprot.writeListEnd()
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class sendMessageToSharedNotebookMembers_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - notFoundException
+   - systemException
+  """
+
+  thrift_spec = (
+    (0, TType.I32, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, notFoundException=None, systemException=None,):
+    self.success = success
+    self.userException = userException
+    self.notFoundException = notFoundException
+    self.systemException = systemException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.I32:
+          self.success = iprot.readI32();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('sendMessageToSharedNotebookMembers_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.I32, 0)
+      oprot.writeI32(self.success)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 2)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 3)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
 class listSharedNotebooks_args(object):
   """
   Attributes:
@@ -15072,11 +18784,11 @@ class listSharedNotebooks_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype212, _size209) = iprot.readListBegin()
-          for _i213 in xrange(_size209):
-            _elem214 = evernote.edam.type.ttypes.SharedNotebook()
-            _elem214.read(iprot)
-            self.success.append(_elem214)
+          (_etype247, _size244) = iprot.readListBegin()
+          for _i248 in xrange(_size244):
+            _elem249 = evernote.edam.type.ttypes.SharedNotebook()
+            _elem249.read(iprot)
+            self.success.append(_elem249)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -15111,8 +18823,8 @@ class listSharedNotebooks_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRUCT, len(self.success))
-      for iter215 in self.success:
-        iter215.write(oprot)
+      for iter250 in self.success:
+        iter250.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -15175,10 +18887,10 @@ class expungeSharedNotebooks_args(object):
       elif fid == 2:
         if ftype == TType.LIST:
           self.sharedNotebookIds = []
-          (_etype219, _size216) = iprot.readListBegin()
-          for _i220 in xrange(_size216):
-            _elem221 = iprot.readI64();
-            self.sharedNotebookIds.append(_elem221)
+          (_etype254, _size251) = iprot.readListBegin()
+          for _i255 in xrange(_size251):
+            _elem256 = iprot.readI64();
+            self.sharedNotebookIds.append(_elem256)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -15199,8 +18911,8 @@ class expungeSharedNotebooks_args(object):
     if self.sharedNotebookIds != None:
       oprot.writeFieldBegin('sharedNotebookIds', TType.LIST, 2)
       oprot.writeListBegin(TType.I64, len(self.sharedNotebookIds))
-      for iter222 in self.sharedNotebookIds:
-        oprot.writeI64(iter222)
+      for iter257 in self.sharedNotebookIds:
+        oprot.writeI64(iter257)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     oprot.writeFieldStop()
@@ -15728,11 +19440,11 @@ class listLinkedNotebooks_result(object):
       if fid == 0:
         if ftype == TType.LIST:
           self.success = []
-          (_etype226, _size223) = iprot.readListBegin()
-          for _i227 in xrange(_size223):
-            _elem228 = evernote.edam.type.ttypes.LinkedNotebook()
-            _elem228.read(iprot)
-            self.success.append(_elem228)
+          (_etype261, _size258) = iprot.readListBegin()
+          for _i262 in xrange(_size258):
+            _elem263 = evernote.edam.type.ttypes.LinkedNotebook()
+            _elem263.read(iprot)
+            self.success.append(_elem263)
           iprot.readListEnd()
         else:
           iprot.skip(ftype)
@@ -15767,8 +19479,8 @@ class listLinkedNotebooks_result(object):
     if self.success != None:
       oprot.writeFieldBegin('success', TType.LIST, 0)
       oprot.writeListBegin(TType.STRUCT, len(self.success))
-      for iter229 in self.success:
-        iter229.write(oprot)
+      for iter264 in self.success:
+        iter264.write(oprot)
       oprot.writeListEnd()
       oprot.writeFieldEnd()
     if self.userException != None:
@@ -16399,6 +20111,482 @@ class emailNote_result(object):
       oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
       return
     oprot.writeStructBegin('emailNote_result')
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 2)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 3)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class shareNote_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+  )
+
+  def __init__(self, authenticationToken=None, guid=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('shareNote_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class shareNote_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - notFoundException
+   - systemException
+  """
+
+  thrift_spec = (
+    (0, TType.STRING, 'success', None, None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, notFoundException=None, systemException=None,):
+    self.success = success
+    self.userException = userException
+    self.notFoundException = notFoundException
+    self.systemException = systemException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRING:
+          self.success = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('shareNote_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRING, 0)
+      oprot.writeString(self.success)
+      oprot.writeFieldEnd()
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 2)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 3)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class stopSharingNote_args(object):
+  """
+  Attributes:
+   - authenticationToken
+   - guid
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'authenticationToken', None, None, ), # 1
+    (2, TType.STRING, 'guid', None, None, ), # 2
+  )
+
+  def __init__(self, authenticationToken=None, guid=None,):
+    self.authenticationToken = authenticationToken
+    self.guid = guid
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.authenticationToken = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('stopSharingNote_args')
+    if self.authenticationToken != None:
+      oprot.writeFieldBegin('authenticationToken', TType.STRING, 1)
+      oprot.writeString(self.authenticationToken)
+      oprot.writeFieldEnd()
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 2)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class stopSharingNote_result(object):
+  """
+  Attributes:
+   - userException
+   - notFoundException
+   - systemException
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, userException=None, notFoundException=None, systemException=None,):
+    self.userException = userException
+    self.notFoundException = notFoundException
+    self.systemException = systemException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('stopSharingNote_result')
+    if self.userException != None:
+      oprot.writeFieldBegin('userException', TType.STRUCT, 1)
+      self.userException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.notFoundException != None:
+      oprot.writeFieldBegin('notFoundException', TType.STRUCT, 2)
+      self.notFoundException.write(oprot)
+      oprot.writeFieldEnd()
+    if self.systemException != None:
+      oprot.writeFieldBegin('systemException', TType.STRUCT, 3)
+      self.systemException.write(oprot)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class authenticateToSharedNote_args(object):
+  """
+  Attributes:
+   - guid
+   - noteKey
+  """
+
+  thrift_spec = (
+    None, # 0
+    (1, TType.STRING, 'guid', None, None, ), # 1
+    (2, TType.STRING, 'noteKey', None, None, ), # 2
+  )
+
+  def __init__(self, guid=None, noteKey=None,):
+    self.guid = guid
+    self.noteKey = noteKey
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 1:
+        if ftype == TType.STRING:
+          self.guid = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRING:
+          self.noteKey = iprot.readString();
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('authenticateToSharedNote_args')
+    if self.guid != None:
+      oprot.writeFieldBegin('guid', TType.STRING, 1)
+      oprot.writeString(self.guid)
+      oprot.writeFieldEnd()
+    if self.noteKey != None:
+      oprot.writeFieldBegin('noteKey', TType.STRING, 2)
+      oprot.writeString(self.noteKey)
+      oprot.writeFieldEnd()
+    oprot.writeFieldStop()
+    oprot.writeStructEnd()
+
+  def __repr__(self):
+    L = ['%s=%r' % (key, value)
+      for key, value in self.__dict__.iteritems()]
+    return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+  def __eq__(self, other):
+    return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not (self == other)
+
+class authenticateToSharedNote_result(object):
+  """
+  Attributes:
+   - success
+   - userException
+   - notFoundException
+   - systemException
+  """
+
+  thrift_spec = (
+    (0, TType.STRUCT, 'success', (evernote.edam.userstore.ttypes.AuthenticationResult, evernote.edam.userstore.ttypes.AuthenticationResult.thrift_spec), None, ), # 0
+    (1, TType.STRUCT, 'userException', (evernote.edam.error.ttypes.EDAMUserException, evernote.edam.error.ttypes.EDAMUserException.thrift_spec), None, ), # 1
+    (2, TType.STRUCT, 'notFoundException', (evernote.edam.error.ttypes.EDAMNotFoundException, evernote.edam.error.ttypes.EDAMNotFoundException.thrift_spec), None, ), # 2
+    (3, TType.STRUCT, 'systemException', (evernote.edam.error.ttypes.EDAMSystemException, evernote.edam.error.ttypes.EDAMSystemException.thrift_spec), None, ), # 3
+  )
+
+  def __init__(self, success=None, userException=None, notFoundException=None, systemException=None,):
+    self.success = success
+    self.userException = userException
+    self.notFoundException = notFoundException
+    self.systemException = systemException
+
+  def read(self, iprot):
+    if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None and fastbinary is not None:
+      fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))
+      return
+    iprot.readStructBegin()
+    while True:
+      (fname, ftype, fid) = iprot.readFieldBegin()
+      if ftype == TType.STOP:
+        break
+      if fid == 0:
+        if ftype == TType.STRUCT:
+          self.success = evernote.edam.userstore.ttypes.AuthenticationResult()
+          self.success.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 1:
+        if ftype == TType.STRUCT:
+          self.userException = evernote.edam.error.ttypes.EDAMUserException()
+          self.userException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 2:
+        if ftype == TType.STRUCT:
+          self.notFoundException = evernote.edam.error.ttypes.EDAMNotFoundException()
+          self.notFoundException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      elif fid == 3:
+        if ftype == TType.STRUCT:
+          self.systemException = evernote.edam.error.ttypes.EDAMSystemException()
+          self.systemException.read(iprot)
+        else:
+          iprot.skip(ftype)
+      else:
+        iprot.skip(ftype)
+      iprot.readFieldEnd()
+    iprot.readStructEnd()
+
+  def write(self, oprot):
+    if oprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated and self.thrift_spec is not None and fastbinary is not None:
+      oprot.trans.write(fastbinary.encode_binary(self, (self.__class__, self.thrift_spec)))
+      return
+    oprot.writeStructBegin('authenticateToSharedNote_result')
+    if self.success != None:
+      oprot.writeFieldBegin('success', TType.STRUCT, 0)
+      self.success.write(oprot)
+      oprot.writeFieldEnd()
     if self.userException != None:
       oprot.writeFieldBegin('userException', TType.STRUCT, 1)
       self.userException.write(oprot)
